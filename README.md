@@ -1,0 +1,6 @@
+## CS 224N Project: Compositional Pre-Training for Semantic Parsing with BERT
+
+#### Arnaud Autef, Simon Hagege
+
+Semantic parsing - the conversion of natural language utterances to logical forms - is a typical natural language processing technique for extracting the meaning of an input sentence. Its applications cover a wide variety of tasks, such as question answering, machine translation, instruction following or regular expression generation. In our project, we will implement a new sequence-to-sequence model for semantic parsing built on a pre-trained bidirectional Transformer BERT (Devlin et al., 2018) encoder and a recurrent neural network (RNN) or Transformer (Vaswani et al., 2017) decoder. The encoder-decoder architecture will be fine-tuned on the semantic parsing data using data recombination techniques described in (Jia and Liang, 2016). The main contribution of our work will be the use of BERT and transformer-based structure in the semantic parsing set-
+ting and the analysis of its potential benefits on such tasks.
