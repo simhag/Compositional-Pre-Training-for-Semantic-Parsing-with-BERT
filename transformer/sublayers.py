@@ -8,6 +8,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from utils import scaledattention, clones
 
 class FeedForward(nn.Module):
     
@@ -58,18 +59,15 @@ class MultiHeadAttention(nn.Module):
         self.d_model = d_model
         self.p_drop = p_drop
 
-        # To be changed by clones
-        self.linearlayer_query = nn.Linear(in_features = d_model, out_features = h*d_k, bias = False)
-        self.linearlayer_keys = nn.Linear(in_features = d_model, out_features = h*d_k, bias = False)
-        self.linearlayer_values = nn.Linear(in_features = d_model, out_features = h*d_v, bias = False)
-
+        self.linearlayer_query = clones(nn.Linear(in_features = d_model, out_features = d_k, bias = False),h)
+        self.linearlayer_key = clones(nn.Linear(in_features = d_model, out_features = d_k, bias = False),h)
+        self.linearlayer_value = clones(nn.Linear(in_features = d_model, out_features = d_v, bias = False),h)
         self.linearlayer_output = nn.Linear(in_features = h*d_v, out_features = d_model, bias = False)
 
         self.layernorm = nn.LayerNorm(normalized_shape = d_model)
         self.drop = nn.Dropout(p = p_drop)
-        self.softmax = nn.Softmax(dim = -1)
 
-    def forward(self, Q, K, V, mask):
+    def forward(self, Q, K, V, mask=None):
         '''
 	    Apply a Mutli-Head Attention module
 		Dimension Query : (batch_size, len_q, d_k), Keys : (batch_size, len_k, d_k), Values : (batch_size, len_v, d_v)
@@ -77,47 +75,21 @@ class MultiHeadAttention(nn.Module):
 			where head_i = Attention(QW_i^Q, KW_i^K, VW_i^V)
 	    As in the Transformer paper, we add a residual connection around the sublayer followed by layer normalization: output(x) = LayerNorm(x + Sublayer(x))
 	    '''
-	        if mask is not None:
-            # Same mask applied to all h heads.
-                mask = mask.unsqueeze(1)
-            nbatches = query.size(0)
-        
-        # 1) Do all the linear projections in batch from d_model => h x d_k 
-        query, key, value = \
-            [l(x).view(nbatches, -1, self.h, self.d_k).transpose(1, 2)
-             for l, x in zip(self.linears, (query, key, value))]
-        
-        # 2) Apply attention on all the projected vectors in batch. 
-        x, self.attn = attention(query, key, value, mask=mask, 
-                                 dropout=self.dropout)
-        
-        # 3) "Concat" using a view and apply a final linear. 
-        x = x.transpose(1, 2).contiguous() \
-             .view(nbatches, -1, self.h * self.d_k)
-        return self.linears[-1](x)
-
-
-    def scaledattention(self, d_k, Q, K, V, mask = None):
-    	'''
-		Compute Scaled attention
-		Dropout to be included ?
-    	'''	
-        dot_prod = torch.matmul(q,k.transpose(-2,-1))
-        dot_prod_scaled = dot_prod/d_k**0.5
-        
         if mask is not None:
-            dot_prod_scaled.masked_fill_(mask.byte(), -float('inf'))
+        # Same mask applied to all h heads.
+            mask = mask.unsqueeze(1)
+        n_batches = Q.size(0)
 
-        attention = self.softmax(dot_prod_scaled)
-        final_output = torch.matmul(attention, V)
-
-        return final_output, attention
-
-
-# To be added to utils
-def clones(module, N):
-    "Produce N identical layers."
-    return nn.ModuleList([copy.deepcopy(module) for _ in range(N)])
+        attention = []
+        
+        for i in range(self.h):
+        	query = self.linearlayer_query[i](Q).view(nbatches, -1, self.d_k) #TO BE CHECKED View & Transpose
+        	key = self.linearlayer_key[i](K).view(nbatches, -1, self.d_k)
+        	value = self.linearlayer_value[i](K).view(nbatches, -1, self.d_v)
+        	attention.append(scaledattention(query, key, value, mask=mask,dropout=self.drop))
+       
+        multihead = self.linearlayer_output(torch.cat(attention, dim = 2))
+        return multihead
 
 '''
 if __name__ == '__main__':
@@ -158,3 +130,6 @@ if __name__ == '__main__':
     print('Test Multi-Head Attention')
     print('-'*80)
 '''
+
+
+
