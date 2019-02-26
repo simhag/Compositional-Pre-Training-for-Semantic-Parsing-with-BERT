@@ -1,3 +1,4 @@
-./src/models/
-./src/BERT_models/
-./srs/__pycache__
+src/models/
+src/BERT_pretrained_models/
+src/__pycache__/
+src/.idea/
