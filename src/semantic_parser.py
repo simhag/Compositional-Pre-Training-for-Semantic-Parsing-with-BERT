@@ -107,6 +107,24 @@ class BSP(nn.Module):
         """
         return self.encoder.forward(source_tensor)  # BERT, we "need" forward
 
+    # def greedy_decode(model, src, src_mask, max_len, start_symbol):
+    #     memory = model.encode(src, src_mask)
+    #     ys = torch.ones(1, 1).fill_(start_symbol).type_as(src.data)
+    #     for i in range(max_len - 1):
+    #         out = model.decode(memory, src_mask,
+    #                            Variable(ys),
+    #                            Variable(subsequent_mask(ys.size(1))
+    #                                     .type_as(src.data)))
+    #         prob = model.generator(out[:, -1])
+    #         _, next_word = torch.max(prob, dim=1)
+    #         next_word = next_word.data[0]
+    #         ys = torch.cat([ys,
+    #                         torch.ones(1, 1).type_as(src.data).fill_(next_word)], dim=1)
+    #     return ys
+
+    # def decode(self, memory, src_mask, tgt, tgt_mask):
+        # return self.decoder(self.tgt_embed(tgt), memory, src_mask, tgt_mask)
+
     def decode(self, encoder_output, enc_masks, target_padded):
         """
         :param encoder_output: size (b, len, dim_bert)
@@ -199,24 +217,6 @@ class BSP(nn.Module):
         for e_id, src_len in enumerate(source_lengths):
             enc_masks[e_id, src_len:] = 1
         return enc_masks.to(self.device)  # ok all good, float is weird though....#TODO check this torch.float
-
-    # def greedy_decode(model, src, src_mask, max_len, start_symbol):
-    #     memory = model.encode(src, src_mask)
-    #     ys = torch.ones(1, 1).fill_(start_symbol).type_as(src.data)
-    #     for i in range(max_len - 1):
-    #         out = model.decode(memory, src_mask,
-    #                            Variable(ys),
-    #                            Variable(subsequent_mask(ys.size(1))
-    #                                     .type_as(src.data)))
-    #         prob = model.generator(out[:, -1])
-    #         _, next_word = torch.max(prob, dim=1)
-    #         next_word = next_word.data[0]
-    #         ys = torch.cat([ys,
-    #                         torch.ones(1, 1).type_as(src.data).fill_(next_word)], dim=1)
-    #     return ys
-
-    # def decode(self, memory, src_mask, tgt, tgt_mask):
-        # return self.decoder(self.tgt_embed(tgt), memory, src_mask, tgt_mask)
 
     def beam_search(self, src_sent: List[str], beam_size: int = 5, max_decoding_time_step: int = 70) -> List[
         Hypothesis]:
