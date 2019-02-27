@@ -4,7 +4,6 @@ Inspired by "Attention Is All You Need" (12/06/2017) - Ashish Vaswani et al. (Go
 Date: 02/26
 '''
 
-import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -18,7 +17,6 @@ class DecoderLayer(nn.Module):
         - MultiHead2 Attention linked to the output of Encoder + MultiHead1
         - FFN linked to MultiHead2
     '''
-
     def __init__(self, d_model = 512, d_int = 2048, d_k = 64, d_v = 64, h = 8, p_drop = 0.1):
         
         super(DecoderLayer, self).__init__()
@@ -36,29 +34,60 @@ class DecoderLayer(nn.Module):
         final_output = self.ffn(out_head2)
         # MASK IN UTILS --> black right i
         # pad_mask + multihead_mask
-
         return final_output
 
 class Transformer(nn.Module):
     '''
     Generate Decoder, composed of Nx DecoderLayer
     '''
-
     def __init__(self, layer, n_layer = 6):
 
         super(Transformer, self).__init__()
         self.layers_decoder = clones(module = layer, N = n_layer)
-
 
     def forward(self, input_dec, output_enc):
 
         for layer in self.layers_decoder:
             input_dec = layer(input_dec = input_dec, output_enc = output_enc)
             # ATTENTION: ADD MASK
-
         return input_dec
 
-'''
+
+class EncoderLayer(nn.Module):
+
+    def __init__(self, d_model = 512, d_int = 2048, d_k = 64, d_v = 64, h = 8, p_drop = 0.1):
+        
+        super(EncoderLayer, self).__init__()
+        
+        self.MultiHead = MultiHeadAttention(h = h, d_k = d_k, d_model = d_model, p_drop = p_drop)
+        self.ffn = FeedForward(dim_in_out = d_model, dim_int = d_int, p_drop = p_drop)
+
+    def forward(self, input_enc, multihead_mask = None):
+        # Multiheadmask set as None by default: to be changed !!!
+ 
+        out_head = self.MultiHead(Q = input_enc, K = input_enc, V = input_enc, mask = multihead_mask)
+
+        final_output = self.ffn(out_head)
+        return final_output
+
+
+class TransformerEncoder(nn.Module):
+    '''
+    Generate Encoder, composed of Nx EncoderLayer
+    '''
+    def __init__(self, layer, n_layer = 6):
+
+        super(TransformerEncoder, self).__init__()
+        self.layers_encoder = clones(module = layer, N = n_layer)
+
+    def forward(self, input_enc):
+
+        for layer in self.layers_encoder:
+            input_enc = layer(input_enc = input_enc)
+            # ATTENTION: ADD MASK
+        return input_enc
+
+
 if __name__ == '__main__':
     d_model, batch_size, d_int, d_k, d_v, h, len_output_sent = 6, 8, 3, 3, 3, 2, 10
     input_dec = torch.rand([batch_size, len_output_sent, d_model])
@@ -66,4 +95,8 @@ if __name__ == '__main__':
     decoder_layer = DecoderLayer(d_model = d_model, d_int = d_int, d_k = d_k, d_v = d_v, h = h, p_drop = 0.1)
     transformer_test = Transformer(layer = decoder_layer, n_layer = 6)
     print(transformer_test(input_dec = input_dec, output_enc = output_enc).size())
-'''
+
+    input_enc = torch.rand([batch_size, len_output_sent, d_model])
+    encoder_layer = EncoderLayer(d_model = d_model, d_int = d_int, d_k = d_k, d_v = d_v, h = h, p_drop = 0.1)
+    transformer_encoder_test = TransformerEncoder(layer = encoder_layer, n_layer = 6)
+    print(transformer_encoder_test(input_enc = input_enc).size())
