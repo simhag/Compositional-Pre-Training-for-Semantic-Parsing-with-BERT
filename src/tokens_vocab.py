@@ -16,3 +16,6 @@ class Vocab(object):
         token_ids_sequences = [self.tokenizer.convert_tokens_to_ids(tokens) for tokens in token_sequences]
         padded_ids_sequences = pad_ids_sequences(token_ids_sequences)
         return torch.tensor(padded_ids_sequences, dtype=torch.long, device=device)
+
+    def to_input_tokens(self, input_strings_sequences):
+        return [self.tokenizer.tokenize(sequence) for sequence in input_strings_sequences]

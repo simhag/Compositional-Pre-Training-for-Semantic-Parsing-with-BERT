@@ -48,8 +48,7 @@ def pad_ids_sequences(ids_sequences):
         # if 0 in ids_sequence:
         #     print('Excuse me wtf?')
         n = len(ids_sequence)
-        for _ in range(max_len - n):
-            ids_sequence.append(0) # 0 is the padding id for tokens
+        ids_sequence += [0] * (max_len - n)
         # assert len(ids_sequence) == max_len
     return ids_sequences
 
