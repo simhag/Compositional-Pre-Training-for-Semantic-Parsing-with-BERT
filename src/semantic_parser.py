@@ -8,7 +8,8 @@ import torch.nn.functional as F
 from torch.nn.utils.rnn import pad_packed_sequence, pack_padded_sequence
 from BERT_encoder import BERT
 from transformer import Transformer
-# from model_embeddings import ModelEmbeddings
+from token_embeddings import DecoderEmbeddings, PositionalEncoding
+
 # from char_decoder import CharDecoder
 
 Hypothesis = namedtuple('Hypothesis', ['value', 'score'])
@@ -21,8 +22,9 @@ class BSP(nn.Module):
         - BERT Encoder
         - Transformer Decoder
     """
-    #TODO adapt vocabulary.py to get vocab, may need to extract words list from training data target examples
-    def __init__(self, input_vocab, linear_output_size, size='base', dropout_rate=0.2):
+
+    # TODO adapt vocabulary.py to get vocab, may need to extract words list from training data target examples
+    def __init__(self, input_vocab, target_vocab, size='base', d_model=512, dropout_rate=0.2):
         """ Init NMT Model.
 
         @param embed_size (int): Embedding size (dimensionality)
@@ -31,28 +33,24 @@ class BSP(nn.Module):
         @param dropout_rate (float): Dropout probability, for attention
         """
         super(BSP, self).__init__()
-
-        # self.model_embeddings_source = ModelEmbeddings(embed_size, vocab.src)
-        # self.model_embeddings_target = ModelEmbeddings(embed_size, vocab.tgt)
-
         self.hidden_size = 768 if size == 'base' else 1024
         self.dropout_rate = dropout_rate
-        self.input_vocab = input_vocab
+        self.input_vocab = input_vocab  # TODO check those objects
         self.target_vocab = target_vocab
+        self.model_embeddings_target = nn.Sequential(DecoderEmbeddings(vocab=self.target_vocab, embed_size=d_model),
+                                                     PositionalEncoding(d_model=d_model, dropout=dropout_rate,
+                                                                        max_len=100))  # simple look-up embedding for tokens
+        # no need for encoder, BERT includes the token embeddings in its architecture
 
         self.encoder = BERT(size)
-        self.decoder = Transformer()
+        self.decoder = Transformer(self.hidden_size, d_model)  # TODO fix input entry
 
-        self.linear_projection = nn.Linear()
+        self.linear_projection = nn.Linear(d_model, len(self.target_vocab.ids_to_tokens), bias=False)
         torch.nn.init.xavier_uniform(self.linear_projection.weight)
-        # self.h_projection = nn.Linear(hidden_size * 2, hidden_size, bias=False)
-        # self.c_projection = nn.Linear(hidden_size * 2, hidden_size, bias=False)
-        # self.att_projection = nn.Linear(hidden_size * 2, hidden_size, bias=False)
-        # self.combined_output_projection = nn.Linear(hidden_size * 2 + hidden_size, hidden_size, bias=False)
-        # self.target_vocab_projection = nn.Linear(hidden_size, len(vocab.tgt), bias=False)
         self.dropout = nn.Dropout(self.dropout_rate)
 
-    #TODO wrapped by <s> and </s> for us?
+        # TODO wrapped by <s> and </s> for us?
+
     def forward(self, source: List[str], target: List[str]) -> torch.Tensor:
         """ Take a mini-batch of source and target sentences, compute the log-likelihood of
         target sentences under the language models learned by the NMT system.
@@ -64,6 +62,13 @@ class BSP(nn.Module):
                                     log-likelihood of generating the gold-standard target sentence for
                                     each example in the input batch. Here b = batch size.
         """
+        # take source and transform into lists of lists of source_tokens
+        # get their lengths
+        # pad source strings and transform them into tensors
+        # encode the source tensor, get encoder_output of size (bize, max_len, embedd_size=768 or 1024)
+        # compute mask for encoder_output entries
+        #
+
         source_tokens = self.input_vocab.to_input_tokens(source)
         source_lengths = [len(s) for s in source_tokens]
         source_tensor = self.input_vocab.to_input_tensor_char(source, device=self.device)
@@ -100,25 +105,20 @@ class BSP(nn.Module):
     def encode(self, source_tensor):
         """ Apply the encoder to source sentences to obtain encoder hidden states.
         """
-        return self.encoder.forward(source_tensor) #BERT, we "need" forward
+        return self.encoder.forward(source_tensor)  # BERT, we "need" forward
 
     def decode(self, encoder_output, enc_masks, target_padded):
-        """Compute combined output vectors for a batch.
-        @param enc_hiddens (Tensor): Hidden states (b, src_len, h*2), where
-                                     b = batch size, src_len = maximum source sentence length, h = hidden size.
-        @param enc_masks (Tensor): Tensor of sentence masks (b, src_len), where
-                                     b = batch size, src_len = maximum source sentence length.
-        @param dec_init_state (tuple(Tensor, Tensor)): Initial state and cell for decoder
-        @param target_padded (Tensor): Gold-standard padded target sentences (tgt_len, b), where
-                                       tgt_len = maximum target sentence length, b = batch size.
-        @returns combined_outputs (Tensor): combined output tensor  (tgt_len, b,  h), where
-                                        tgt_len = maximum target sentence length, b = batch_size,  h = hidden size
+        """
+        :param encoder_output: size (b, len, dim_bert)
+        :param enc_masks: size (b, len)
+        :param target_padded: size (b, len')
+        :return:
         """
         # Chop of the <END> token for max length sentences.
         target_padded = target_padded[:-1]
 
         # Initialize the decoder state (hidden and cell)
-        dec_state = encoder_output
+        # dec_state = sel
         # Initialize previous combined output vector o_{t-1} as zero
         batch_size = enc_hiddens.size(0)
         o_prev = torch.zeros(batch_size, self.hidden_size, device=self.device)
@@ -195,10 +195,28 @@ class BSP(nn.Module):
         @returns enc_masks (Tensor): Tensor of sentence masks of shape (b, src_len),
                                     where src_len = max source length, h = hidden size.
         """
-        enc_masks = torch.zeros(enc_hiddens.size(0), enc_hiddens.size(1), dtype=torch.float)
+        enc_masks = torch.zeros(enc_hiddens.size(0), enc_hiddens.size(1), dtype=torch.float)  # size bsize, max_len
         for e_id, src_len in enumerate(source_lengths):
             enc_masks[e_id, src_len:] = 1
-        return enc_masks.to(self.device)
+        return enc_masks.to(self.device)  # ok all good, float is weird though....#TODO check this torch.float
+
+    # def greedy_decode(model, src, src_mask, max_len, start_symbol):
+    #     memory = model.encode(src, src_mask)
+    #     ys = torch.ones(1, 1).fill_(start_symbol).type_as(src.data)
+    #     for i in range(max_len - 1):
+    #         out = model.decode(memory, src_mask,
+    #                            Variable(ys),
+    #                            Variable(subsequent_mask(ys.size(1))
+    #                                     .type_as(src.data)))
+    #         prob = model.generator(out[:, -1])
+    #         _, next_word = torch.max(prob, dim=1)
+    #         next_word = next_word.data[0]
+    #         ys = torch.cat([ys,
+    #                         torch.ones(1, 1).type_as(src.data).fill_(next_word)], dim=1)
+    #     return ys
+
+    # def decode(self, memory, src_mask, tgt, tgt_mask):
+        # return self.decoder(self.tgt_embed(tgt), memory, src_mask, tgt_mask)
 
     def beam_search(self, src_sent: List[str], beam_size: int = 5, max_decoding_time_step: int = 70) -> List[
         Hypothesis]:
