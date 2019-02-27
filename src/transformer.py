@@ -54,6 +54,11 @@ class Transformer(nn.Module):
 
 
 class EncoderLayer(nn.Module):
+	'''
+    Define the EncoderLayer, composed of:
+        - MultiHead Attention linked to the input of the Encoder
+        - FFN linked to MultiHead
+    '''
 
     def __init__(self, d_model = 512, d_int = 2048, d_k = 64, d_v = 64, h = 8, p_drop = 0.1):
         
@@ -87,7 +92,7 @@ class TransformerEncoder(nn.Module):
             # ATTENTION: ADD MASK
         return input_enc
 
-
+'''
 if __name__ == '__main__':
     d_model, batch_size, d_int, d_k, d_v, h, len_output_sent = 6, 8, 3, 3, 3, 2, 10
     input_dec = torch.rand([batch_size, len_output_sent, d_model])
@@ -100,3 +105,4 @@ if __name__ == '__main__':
     encoder_layer = EncoderLayer(d_model = d_model, d_int = d_int, d_k = d_k, d_v = d_v, h = h, p_drop = 0.1)
     transformer_encoder_test = TransformerEncoder(layer = encoder_layer, n_layer = 6)
     print(transformer_encoder_test(input_enc = input_enc).size())
+'''
