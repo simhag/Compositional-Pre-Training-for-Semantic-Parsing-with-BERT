@@ -84,6 +84,10 @@ class MultiHeadAttention(nn.Module):
             print("Size: ", K.size())
             print("This is V input: \n", V)
             print("Size: ", V.size())
+            if mask is not None:
+                print("This is mask: \n", mask)
+                print("Size: ", mask.size())
+
       
         query, key, value = [layer(k).view(n_batches,-1,self.h,self.d_k).transpose(1,2) for layer,k in zip(self.linear_layers, (Q,K,V))]
 
@@ -95,14 +99,13 @@ class MultiHeadAttention(nn.Module):
             print("This is V input: \n", V)
             print("Size: ", V.size())
 
-        x, attention = scaledattention(query, key, value, mask = mask, dropout = self.drop, verbose = verbose)
+        x, self.attention = scaledattention(query, key, value, mask = mask, dropout = self.drop, verbose = verbose)
         if verbose:
-            print("This is Final Attention: \n", x)
+            print("This is MultiHeadAttention: \n", x)
             print("Size: ", x.size())
-        self.attention = attention
         x = x.transpose(1, 2).contiguous().view(n_batches, -1, self.h * self.d_k)
         if verbose:
-            print("This is Final Attention, after concat: \n", x)
+            print("This is MultiHeadAttention, after concat: \n", x)
             print("Size: ", x.size())
         output = self.linear_layers[-1](x)
         output_post_drop = self.drop(output)
@@ -158,5 +161,18 @@ if __name__ == '__main__':
     shape_expected = torch.Size([batch_size, len_q, d_model])
     assert shape_produced == shape_expected, \
         "dimensionality test resulted in shapes {:}, expected {:}".format(shape_produced, shape_expected)    
+    print('Passed!')
+
+    print('Test on mask')
+    d_k,d_model,h,batch_size = 2,4,2,3
+    len_q, len_k, len_v = 6,6,6
+    multihead = MultiHeadAttention(h = h, d_k = d_k, d_model = d_model, p_drop = 0)
+    Q = torch.rand(batch_size, len_q, h*d_k)
+    K = torch.rand(batch_size, len_k, h*d_k)
+    V = torch.rand(batch_size, len_v, h*d_k)
+    mask_test = torch.tensor([[0,0,0,0,1,1],[0,1,0,0,1,1],[0,1,1,0,0,0]])
+    mask_test = mask_test.unsqueeze(dim = 2)
+    shape_produced = multihead.forward(Q,K,V, mask = mask_test, verbose = True).size()
+    shape_expected = torch.Size([batch_size, len_q, d_model])
     print('Passed!')
 '''

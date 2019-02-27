@@ -25,7 +25,7 @@ def scaledattention(Q, K, V, mask = None, dropout = None, verbose = False):
     dot_prod_scaled = dot_prod/d_k**0.5
     
     if mask is not None:
-        dot_prod_scaled.masked_fill_(mask.byte(), -float('inf'))
+        dot_prod_scaled  = dot_prod_scaled.masked_fill_(mask.transpose(2,3) == 0, -float('inf'))
 
     attention = F.softmax(dot_prod_scaled, dim = -1)
     if verbose:
@@ -99,6 +99,26 @@ def data_iterator(input_data, batch_size, shuffle=False):
         inputs = [batch_example[0] for batch_example in batch_examples]
         outputs = [batch_example[1] for batch_example in batch_examples]
         yield (inputs, outputs)
+
+'''
+def generate_subsequent_mask(seq):
+    
+    Mask the subsequent info 
+    
+    att_mask = 
+'''
+
+def generate_sent_mask(tgt, source_lengths):
+    '''
+    Generate sentence masks for encoder hidden states
+    :param: tensor of shape (batch_size, max_source_len)
+    :return: tensor of dimensions (batch_size, max_source_len) containing 1 in positions corresponding to 'pad' tokens and 0 for non-pad tokens
+    '''
+    tgt_mask = torch.zeros(tgt.size(0), tgt.size(1), dtype = torch.float)
+    for e_id, src_len in enumerate(source_lengths):
+        tgt_mask[e_id, src_len:] = 1
+    return tgt_mask.to()
+
 
 # if __name__ == '__main__':
 #     # file_paths = ['geo880_dev100.tsv', 'geo880_test280.tsv', 'geo880_train100.tsv']

@@ -8,7 +8,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import utils
+from utils import clones
 from sublayers import FeedForward, MultiHeadAttention
 
 class DecoderLayer(nn.Module):
@@ -31,7 +31,7 @@ class DecoderLayer(nn.Module):
         # Multiheadmask set as None by default: to be changed !!!
  
         out_head1 = self.MultiHead1(Q = input_dec, K = input_dec, V = input_dec, mask = multihead1_mask)
-        out_head2 = self.MultiHead1(Q = out_head1, K = output_enc, V = output_enc, mask = multihead2_mask)
+        out_head2 = self.MultiHead2(Q = out_head1, K = output_enc, V = output_enc, mask = multihead2_mask)
 
         final_output = self.ffn(out_head2)
         # MASK IN UTILS --> black right i
@@ -46,19 +46,24 @@ class Transformer(nn.Module):
 
     def __init__(self, layer, n_layer = 6):
 
-        super(Decoder, self).__init__()
+        super(Transformer, self).__init__()
         self.layers_decoder = clones(module = layer, N = n_layer)
 
 
     def forward(self, input_dec, output_enc):
 
-        multihead1_mask, multihead2_mask = None, None
-
         for layer in self.layers_decoder:
-            input_dec = layer(input_dec = input_dec, output_enc = output_enc, multihead1_mask, multihead2_mask)
+            input_dec = layer(input_dec = input_dec, output_enc = output_enc)
+            # ATTENTION: ADD MASK
 
         return input_dec
 
-
+'''
 if __name__ == '__main__':
-    x = torch.rand()
+    d_model, batch_size, d_int, d_k, d_v, h, len_output_sent = 6, 8, 3, 3, 3, 2, 10
+    input_dec = torch.rand([batch_size, len_output_sent, d_model])
+    output_enc = torch.rand([batch_size, len_output_sent, d_model])
+    decoder_layer = DecoderLayer(d_model = d_model, d_int = d_int, d_k = d_k, d_v = d_v, h = h, p_drop = 0.1)
+    transformer_test = Transformer(layer = decoder_layer, n_layer = 6)
+    print(transformer_test(input_dec = input_dec, output_enc = output_enc).size())
+'''
