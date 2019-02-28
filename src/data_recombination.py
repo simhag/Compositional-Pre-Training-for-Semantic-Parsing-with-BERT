@@ -1,5 +1,18 @@
 '''
 Define class that executes the data recombination
+To be called: python data_recombination.py [file] [domain] [aug-type] [num]
+  where [file] = path
+        [domain] = {geoquery, artificial}
+        [aug_type] = {entity, nesting, concatk}
+        [num] = # of data samples to be generated
+NB: The rules work the following way:
+  For:
+    1. "what states border texas ?"
+    2. "what is the highest mountain in ohio ?"
+  We generate:
+    1. entity: "what states border ohio ?" or "what is the highest mountain in texas ?"
+    2. nesting: "what is the highest mountain in states border texas ?"
+    3. concat2: "what states border texas ? </s> what is the highest mountain in ohio ?"
 '''
 
 import collections
@@ -9,9 +22,11 @@ import sys
 
 import domains
 from grammar import Grammar
-from vocabulary import Vocabulary 
 
-class Augmenter(object):
+
+END_OF_SENTENCE = '</s>'
+class Augmenter():
+  
   def __init__(self, domain, dataset, aug_types):
     self.domain = domain
     self.dataset = dataset
@@ -20,6 +35,7 @@ class Augmenter(object):
 
   def setup_grammar(self, aug_types):
     grammar = Grammar(self.dataset)
+    #print("This is grammar rule list: \n", grammar.rule_list)
     for aug_type in aug_types:
       if aug_type == 'entity':
         grammar = self.induce_entity_grammar(grammar)
@@ -39,8 +55,8 @@ class Augmenter(object):
     for span, rep in swaps:
       # Ensure disjoint
       if span[1] > cur_left:
-        print >> sys.stderr, s
-        print >> sys.stderr, swaps
+        print(s, file = sys.stderr)
+        print(swaps, file = sys.stderr)
         raise ValueError('Non-disjoint spans detected')
       new_s = new_s[:span[0]] + rep + new_s[span[1]:]
       cur_left = span[0]
@@ -100,7 +116,7 @@ class Augmenter(object):
                  for i, (inner_cat, x_span, y_span) in enumerate(alignments)]
       y_new = self.splice(y_str, y_swaps)
       new_grammar.add_rule(cat, x_new, y_new)
-    new_grammar.print_self()
+    #new_grammar.print_self()
     return new_grammar
 
   def induce_concat_grammar(self, start_grammar, concat_num):
@@ -108,11 +124,14 @@ class Augmenter(object):
 
     for cat, x_str, y_str in start_grammar.rule_list:
       if cat == start_grammar.ROOT:
+        #print("This is X :", x_str)
+        #print("This is Y :", y_str)
         new_grammar.add_rule('$sentence', x_str, y_str)
       else:
         new_grammar.add_rule(cat, x_str, y_str)
-    root_str = (' %s ' % Vocabulary.END_OF_SENTENCE).join(
-        '$sentence_%d' % i for i in range(concat_num))
+    #print("This is the grammar :", new_grammar.rule_list)
+    root_str = (' %s ' % '</s>').join('$sentence_%d' % i for i in range(concat_num))
+    #print("This is the root_str :", root_str)
     new_grammar.add_rule(new_grammar.ROOT, root_str, root_str)
     #new_grammar.print_self()
     return new_grammar
@@ -128,7 +147,7 @@ class Augmenter(object):
 def main():
   """Print augmented data to stdout."""
   if len(sys.argv) < 5:
-    print >> sys.stderr, 'Usage: %s [file] [domain] [aug-type] [num]' % sys.argv[0]
+    print('Usage: %s [file] [domain] [aug-type] [num]' % sys.argv[0], file = sys.stderr)
     sys.exit(1)
   fname, domain_name, aug_type_str, num = sys.argv[1:5]
   num = int(num)
@@ -143,7 +162,7 @@ def main():
   augmenter = Augmenter(domain, data, aug_types)
   aug_data = augmenter.sample(num)
   for ex in aug_data:
-    print '\t'.join(ex)
+    print('\t'.join(ex))
 
 if __name__ == '__main__':
   main()
