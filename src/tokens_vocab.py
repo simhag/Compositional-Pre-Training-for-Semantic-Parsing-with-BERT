@@ -8,7 +8,7 @@ class Vocab(object):
         self.tokenizer = BertTokenizer.from_pretrained(BERT_model, do_lower_case=True)
         # CUSTOM START AND END TOKENS ADDED
         self.tokenizer.ids_to_tokens[1] = '[START]'
-        self.tokenizer.ids_to_tokens[1] = '[END]'
+        self.tokenizer.ids_to_tokens[2] = '[END]'
 
     def to_input_tensor(self, input_strings_sequences, device):
         """

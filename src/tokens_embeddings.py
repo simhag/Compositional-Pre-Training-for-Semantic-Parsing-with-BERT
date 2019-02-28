@@ -5,9 +5,8 @@ import math
 
 
 class PositionalEncoding(nn.Module):
-    "Implement the PE function."
-
-    def __init__(self, d_model, dropout, max_len=5000):
+    #TODO check the numerical values given our small input lengths...
+    def __init__(self, d_model, dropout, max_len=100):
         super(PositionalEncoding, self).__init__()
         self.dropout = nn.Dropout(p=dropout)
 
@@ -23,12 +22,13 @@ class PositionalEncoding(nn.Module):
 
     def forward(self, x):
         """
-        input: b, embed_size, max_len
-        :rtype: b, max_len, embed_size
+        input: b, len, embed_size
+        pe of size (1, len, embed_size)
+        :rtype: b, len, embed_size
         """
         x = x + Variable(self.pe[:, :x.size(1)],
                          requires_grad=False)
-        return self.dropout(x).transpose(1, 2)
+        return self.dropout(x)
 
 
 class DecoderEmbeddings(nn.Module):
@@ -51,7 +51,7 @@ class DecoderEmbeddings(nn.Module):
     def forward(self, input):
         """
         input: size bsize, max_n_tokens
-        :rtype: size bsize, embed_size, max_n_tokens
+        :rtype: size bsize, max_n_tokens, embed_size
         """
         output = self.embeddings(input)
-        return output.transpose(1, 2)
+        return output

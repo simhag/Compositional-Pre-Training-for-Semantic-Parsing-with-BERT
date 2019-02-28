@@ -16,78 +16,99 @@ import numpy as np
 import random
 
 
+def initialize_weights(model):
+    for p in model.parameters():
+        if p.dim() > 1:
+            nn.init.xavier_uniform(p)
+    return
+
+
 class BSP(nn.Module):
     """ BERT Semantic Parser:
         - BERT Encoder
         - Transformer Decoder
     """
 
-    # TODO adapt vocabulary.py to get vocab, may need to extract words list from training data target examples
-    def __init__(self, input_vocab, target_vocab, size='base', d_model=512, dropout_rate=0.2):
-        """ Init NMT Model.
-
-        @param embed_size (int): Embedding size (dimensionality)
-        @param hidden_size (int): Hidden Size (dimensionality)
-        @param vocab (Vocab): Vocabulary object mapping input sentences (string) to tensors of token ids
-        @param dropout_rate (float): Dropout probability, for attention
+    def __init__(self, input_vocab, target_vocab, size='base', d_model=512, dropout_rate=0.1):
+        """
+        :param input_vocab: Vocab based on BERT tokenizer #TODO check if needs more words
+        :param target_vocab: Vocab based on BERT tokenizer, requires embedding. Fields tokenizer, tokenizer.ids_to_tokens = ordered_dict
+        pad=0, start=1, end=2
+        :param size: Size of the BERT model: base or large
+        :param d_model: dimension of transformer embeddings #TODO add linear layer to map BERT output to dim 512?
+        :param dropout_rate:dropout, default 0.1
         """
         super(BSP, self).__init__()
         self.hidden_size = 768 if size == 'base' else 1024
         self.dropout_rate = dropout_rate
-        self.input_vocab = input_vocab  # TODO check those objects
+        self.input_vocab = input_vocab
         self.target_vocab = target_vocab
         self.model_embeddings_target = nn.Sequential(DecoderEmbeddings(vocab=self.target_vocab, embed_size=d_model),
                                                      PositionalEncoding(d_model=d_model, dropout=dropout_rate,
                                                                         max_len=100))  # simple look-up embedding for tokens
         # no need for encoder, BERT includes the token embeddings in its architecture
-
         self.encoder = BERT(size)
         self.decoder = Transformer(layer=DecoderLayer(), N=6)
-
         self.linear_projection = nn.Linear(d_model, len(self.target_vocab.ids_to_tokens), bias=False)
-        torch.nn.init.xavier_uniform(self.linear_projection.weight)
+        nn.init.xavier_uniform(self.linear_projection.weight)
         self.dropout = nn.Dropout(self.dropout_rate)
+        
+        initialize_weights(self.decoder)
+        initialize_weights(self.linear_projection)
+        initialize_weights(self.model_embeddings_target)
 
     def forward(self, sources: List[str], targets: List[str]) -> torch.Tensor:
         """
         :param source: source strings of size bsize
         :param target: target strings of sizes bsize
-        :return:
+        :return: scores, sum of log prob of outputs
         """
-        # take source and transform into lists of lists of source_tokens
-        # get their lengths
-        # pad source strings and transform them into tensors
-        # encode the source tensor, get encoder_output of size (bize, max_len, embedd_size=768 or 1024)
-        # compute mask for encoder_output entries
-        #
-        target_tokens = self.target_vocab.to_input_tokens(targets)
-        target_tokens_y = [tokens[1:] + '[END]' for tokens in target_tokens]
-        target_tokens = ['[START]' + tokens for tokens in target_tokens]
+        #Take source sentences bsize strings
+        #Convert to tokens
+        #Keep in minde the nb of tokens per batch example
+        #Pad and convert to input tensor for BERT
         source_tokens = self.input_vocab.to_input_tokens(sources)
         source_lengths = [len(s) for s in source_tokens]
         source_tensor = self.input_vocab.to_input_tensor_char(sources, device=self.device)
-        target_tokens_padded = self.target_vocab.tokens_to_tensor(target_tokens, device=self.device)
-        target_y_padded = self.target_vocab.tokens_to_tensor(target_tokens_y, device=self.device)
-        encoder_output, _ = self.encode(source_tensor)
-        enc_masks = self.generate_sent_masks(encoder_output, source_lengths)
-        target_tokens_mask = BSP.generate_target_mask(target_tokens_padded, pad_idx=0)
+        #feed to BERT
+        encoder_output, _ = self.encode(source_tensor) #size batch, maxlen, d_model
+        #use lengths kept in mind to get mask over the encoder output (padding mask)
+        enc_masks = self.generate_sent_masks(encoder_output, source_lengths) #size batch, max_len
+
+        #Take target and get tokens
+        target_tokens = self.target_vocab.to_input_tokens(targets)
+        #Add END at the end to get the target we will compare to for log probs
+        target_tokens_y = [tokens[1:] + '[END]' for tokens in target_tokens]
+        #Add START at the beginning to get the target we use along with the decoder to generate log probs
+        target_tokens = ['[START]' + tokens for tokens in target_tokens]
+
+
+        #To be fed to the decoder
+        target_tokens_padded = self.target_vocab.tokens_to_tensor(target_tokens, device=self.device) #size bsize, max_len
+        #To be used for log_probs
+        target_y_padded = self.target_vocab.tokens_to_tensor(target_tokens_y, device=self.device) #size bsize, max_len
+
+        #Mask for the decoder: for padding AND autoregressive constraints
+        target_tokens_mask = BSP.generate_target_mask(target_tokens_padded, pad_idx=0) #size bsize, maxlen, maxlen
+
+        #Ready for the decoder with source, its mask, target, its mask
         decoder_output = self.decode(encoder_output, target_tokens_padded, enc_masks, target_tokens_mask)
 
-        P = F.log_softmax(self.linear_projection(decoder_output), dim=-1)
+        #Projection of the decoder output in linear layer without bias and logsoftmax
+        P = F.log_softmax(self.linear_projection(decoder_output), dim=-1) #size bsize, max_len, len_vocab pour oim
 
         # Zero out, probabilities for which we have nothing in the target text
         target_masks_y = (target_y_padded != 0).float()
 
-        # Compute log probability of generating true target words
+        # Compute log probability of generating true target words -> dark magic I need to check
         target_gold_words_log_prob = torch.gather(P, index=target_y_padded.unsqueeze(-1), dim=-1).squeeze(
             -1) * target_masks_y
         scores = target_gold_words_log_prob.sum()
         return scores
 
     def encode(self, source_tensor):
-        """ Apply the encoder to source sentences to obtain encoder hidden states.
-        """
-        return self.encoder.forward(source_tensor)  # BERT, we "need" forward
+        #simply apply BERT, may need the forward though
+        return self.encoder(source_tensor)
 
     @staticmethod
     def subsequent_mask(size):
@@ -95,6 +116,17 @@ class BSP(nn.Module):
         attn_shape = (1, size, size)
         subsequent_mask = np.triu(np.ones(attn_shape), k=1).astype('uint8')
         return torch.from_numpy(subsequent_mask) == 0
+
+    def generate_sent_masks(self, enc_output, source_lengths):
+        """
+        source_lengths list of ints, len=bsize
+        enc_output of size bsize, len, d_model
+        :rtype: enc_masks: long tensor of size bsize, len
+        """
+        enc_masks = torch.zeros(enc_output.size(0), enc_output.size(1), dtype=torch.long)
+        for e_id, src_len in enumerate(source_lengths):
+            enc_masks[e_id, src_len:] = 1
+        return enc_masks.to(self.device)
 
     @staticmethod
     def generate_target_mask(target_padded, pad_idx):
