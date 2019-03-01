@@ -42,7 +42,15 @@ class BSP(nn.Module):
         self.hidden_size = 768 if size == 'base' else 1024
         self.dropout_rate = dropout_rate
         self.input_vocab = input_vocab
-        self.target_vocab = target_vocab
+        self.target_vocab = target_vocab #peutetre faire nous-meme le vocab pour le decoder, puis look-up embedding dessus, petit helper dans le code de hugging face
+
+        # def whitespace_tokenize(text):
+        #     """Runs basic whitespace cleaning and splitting on a piece of text."""
+        #     text = text.strip()
+        #     if not text:
+        #         return []
+        #     tokens = text.split()
+        #     return tokens
         self.model_embeddings_target = nn.Sequential(DecoderEmbeddings(vocab=self.target_vocab, embed_size=d_model),
                                                      PositionalEncoding(d_model=d_model, dropout=dropout_rate,
                                                                         max_len=100))  # simple look-up embedding for tokens
@@ -50,7 +58,6 @@ class BSP(nn.Module):
         self.encoder = BERT(size)
         self.decoder = Transformer(layer=DecoderLayer(), N=6)
         self.linear_projection = nn.Linear(d_model, len(self.target_vocab.ids_to_tokens), bias=False)
-        nn.init.xavier_uniform(self.linear_projection.weight)
         self.dropout = nn.Dropout(self.dropout_rate)
         
         initialize_weights(self.decoder)
@@ -78,10 +85,9 @@ class BSP(nn.Module):
         #Take target and get tokens
         target_tokens = self.target_vocab.to_input_tokens(targets)
         #Add END at the end to get the target we will compare to for log probs
-        target_tokens_y = [tokens[1:] + '[END]' for tokens in target_tokens]
+        target_tokens_y = [tokens + '[END]' for tokens in target_tokens]
         #Add START at the beginning to get the target we use along with the decoder to generate log probs
         target_tokens = ['[START]' + tokens for tokens in target_tokens]
-
 
         #To be fed to the decoder
         target_tokens_padded = self.target_vocab.tokens_to_tensor(target_tokens, device=self.device) #size bsize, max_len
@@ -134,9 +140,9 @@ class BSP(nn.Module):
         target padded = long tensor of size bsize, max_len_tokens
         :rtype: mask of dimension
         """
-        tgt_mask = (target_padded != pad).unsqueeze(-2) #bsize, 1, len
+        tgt_mask = (target_padded != pad_idx).unsqueeze(-2) #bsize, 1, len
         tgt_mask = tgt_mask & Variable(BSP.subsequent_mask(target_padded.size(-1)).type_as(tgt_mask.data))
-        return tgt_mask
+        return tgt_mask #size b, max_len, max_len
 
     def decode(self, encoder_output, enc_masks, target_padded, target_padded_mask):
         """

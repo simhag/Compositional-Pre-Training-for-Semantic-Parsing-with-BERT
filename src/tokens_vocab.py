@@ -2,13 +2,15 @@ from pytorch_pretrained_bert.tokenization import BertTokenizer
 from utils import pad_ids_sequences
 import torch
 
-#TODO verif que le dataset ne contienne pas de mots inconnus, auquel cas les rajouter
+
+# TODO verif que le dataset ne contienne pas de mots inconnus, auquel cas les rajouter
 class Vocab(object):
     def __init__(self, BERT_model):
         self.tokenizer = BertTokenizer.from_pretrained(BERT_model, do_lower_case=True)
         # CUSTOM START AND END TOKENS ADDED
         self.tokenizer.ids_to_tokens[1] = '[START]'
         self.tokenizer.ids_to_tokens[2] = '[END]'
+        # self.tokenizer.ids_to_tokens[3] = '</s>'
 
     def to_input_tensor(self, input_strings_sequences, device):
         """
