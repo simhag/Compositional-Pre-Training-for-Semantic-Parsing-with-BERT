@@ -11,9 +11,9 @@ class PositionalEncoding(nn.Module):
         self.dropout = nn.Dropout(p=dropout)
 
         # Compute the positional encodings once in log space.
-        pe = torch.zeros(max_len, d_model)
-        position = torch.arange(0, max_len).unsqueeze(1)
-        div_term = torch.exp(torch.arange(0, d_model, 2) *
+        pe = torch.zeros(max_len, d_model, dtype=torch.float)
+        position = torch.arange(0, max_len, dtype=torch.float).unsqueeze(1)
+        div_term = torch.exp(torch.arange(0, d_model, 2, dtype=torch.float) *
                              -(math.log(10000.0) / d_model))
         pe[:, 0::2] = torch.sin(position * div_term)
         pe[:, 1::2] = torch.cos(position * div_term)
@@ -43,9 +43,9 @@ class DecoderEmbeddings(nn.Module):
         @param vocab (VocabEntry): VocabEntry object. See vocab.py for documentation.
         """
         super(DecoderEmbeddings, self).__init__()
-        pad_token_idx = vocab.ids_to_tokens['[PAD]']
-        assert pad_token_idx == 0
-        self.embeddings = nn.Embedding(len(vocab.ids_to_tokens), embed_size, padding_idx=pad_token_idx)
+        pad_token_idx = 0 #vocab.tokenizer.ids_to_tokens[0]
+        assert vocab.tokenizer.ids_to_tokens[0] == '[PAD]'
+        self.embeddings = nn.Embedding(len(vocab.tokenizer.ids_to_tokens), embed_size, padding_idx=pad_token_idx)
         self.positional_encoding = PositionalEncoding(d_model=embed_size, dropout=dropout_rate, max_len=max_len)
 
     def forward(self, input):

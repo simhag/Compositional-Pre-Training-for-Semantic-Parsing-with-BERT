@@ -10,8 +10,9 @@ import torch.nn as nn
 import torch.nn.functional as F
 from utils import scaledattention, clones
 
+
 class FeedForward(nn.Module):
-    
+
     def __init__(self, dim_in_out, dim_int, p_drop):
         '''
         In the paper: dim_in = dim_out = 512, d_int = 2048, p_drop = 0.1
@@ -22,10 +23,10 @@ class FeedForward(nn.Module):
         self.dim_int = dim_int
         self.p_drop = p_drop
 
-        self.linearlayer1 = nn.Linear(in_features = dim_in_out, out_features = dim_int, bias = True)
-        self.linearlayer2 = nn.Linear(in_features = dim_int, out_features = dim_in_out, bias = True)
-        self.layernorm = nn.LayerNorm(normalized_shape = dim_in_out)
-        self.drop = nn.Dropout(p = p_drop)
+        self.linearlayer1 = nn.Linear(in_features=dim_in_out, out_features=dim_int, bias=True)
+        self.linearlayer2 = nn.Linear(in_features=dim_int, out_features=dim_in_out, bias=True)
+        self.layernorm = nn.LayerNorm(normalized_shape=dim_in_out)
+        self.drop = nn.Dropout(p=p_drop)
 
     def forward(self, input):
         '''
@@ -34,18 +35,19 @@ class FeedForward(nn.Module):
         As in the Transformer paper, we add a residual connection around the sublayer followed by layer normalization: output(x) = LayerNorm(x + Sublayer(x))
         '''
         int_relu = F.relu(self.linearlayer1(input))
-        #print(int_relu)
+        # print(int_relu)
         output = self.linearlayer2(int_relu)
-        #print(output)
+        # print(output)
         output_post_drop = self.drop(output)
-        #print(output_post_drop)
+        # print(output_post_drop)
         final_output = self.layernorm(input + output_post_drop)
-        #print(final_output)
-        
+        # print(final_output)
+
         return final_output
 
+
 class MultiHeadAttention(nn.Module):
-    
+
     def __init__(self, h, d_k, d_model, p_drop):
         '''
         In the paper: h = 8, d_k = d_v = 64, d_model = 512, p_drop = 0.1. Assume d_k = d_v
@@ -58,13 +60,13 @@ class MultiHeadAttention(nn.Module):
         self.d_model = d_model
         self.p_drop = p_drop
 
-        self.linear_layers = clones(nn.Linear(in_features = d_model, out_features = d_model, bias = False),4)
+        self.linear_layers = clones(nn.Linear(in_features=d_model, out_features=d_model, bias=False), 4)
 
         self.attention = None
-        self.layernorm = nn.LayerNorm(normalized_shape = d_model)
-        self.drop = nn.Dropout(p = p_drop)
+        self.layernorm = nn.LayerNorm(normalized_shape=d_model)
+        self.drop = nn.Dropout(p=p_drop)
 
-    def forward(self, Q, K, V, mask = None, verbose = False):
+    def forward(self, Q, K, V, mask=None, verbose=False):
         '''
         Apply a Mutli-Head Attention module
         Dimension Query : (batch_size, len_q, d_model), Keys : (batch_size, len_k, d_model), Values : (batch_size, len_v, d_model)
@@ -73,7 +75,7 @@ class MultiHeadAttention(nn.Module):
         As in the Transformer paper, we add a residual connection around the sublayer followed by layer normalization: output(x) = LayerNorm(x + Sublayer(x))
         '''
         if mask is not None:
-        # Same mask applied to all h heads.
+            # Same mask applied to all h heads.
             mask = mask.unsqueeze(1)
         n_batches = Q.size(0)
 
@@ -88,8 +90,8 @@ class MultiHeadAttention(nn.Module):
                 print("This is mask: \n", mask)
                 print("Size: ", mask.size())
 
-      
-        query, key, value = [layer(k).view(n_batches,-1,self.h,self.d_k).transpose(1,2) for layer,k in zip(self.linear_layers, (Q,K,V))]
+        query, key, value = [layer(k).view(n_batches, -1, self.h, self.d_k).transpose(1, 2) for layer, k in
+                             zip(self.linear_layers, (Q, K, V))]
 
         if verbose:
             print("This is Q input: \n", Q)
@@ -99,7 +101,7 @@ class MultiHeadAttention(nn.Module):
             print("This is V input: \n", V)
             print("Size: ", V.size())
 
-        x, self.attention = scaledattention(query, key, value, mask = mask, dropout = self.drop, verbose = verbose)
+        x, self.attention = scaledattention(query, key, value, mask=mask, dropout=self.drop, verbose=verbose)
         if verbose:
             print("This is MultiHeadAttention: \n", x)
             print("Size: ", x.size())
@@ -112,6 +114,8 @@ class MultiHeadAttention(nn.Module):
         final_output = self.layernorm(output_post_drop + Q)
 
         return final_output
+
+
 '''
 if __name__ == '__main__':
     print('-'*80)

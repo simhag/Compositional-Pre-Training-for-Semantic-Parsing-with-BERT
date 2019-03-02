@@ -9,6 +9,8 @@ class Vocab(object):
         self.tokenizer = BertTokenizer.from_pretrained(BERT_model, do_lower_case=True)
         # CUSTOM START AND END TOKENS ADDED
         self.tokenizer.ids_to_tokens[1] = '[START]'
+        self.tokenizer.vocab['[START]'] = 1
+        self.tokenizer.vocab['[END]'] = 2
         self.tokenizer.ids_to_tokens[2] = '[END]'
         # self.tokenizer.ids_to_tokens[3] = '</s>'
 

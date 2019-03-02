@@ -4,39 +4,49 @@ import os
 from utils import read_GeoQuery, data_iterator
 from pytorch_pretrained_bert.modeling import BertModel
 from tokens_vocab import Vocab
-# from semantic_parser import BSP
+from semantic_parser import TSP, BSP
+from utils import get_dataset, save_model
+from tensorboardX import SummaryWriter
+import time
+import math
 
 parser = ArgumentParser()
 parser.add_argument("--data_folder", type=str, default="geoQueryData")
 parser.add_argument("--data_file", type=str, default="geo880_train100.tsv")
-parser.add_argument("--BERT", default="bert-base-uncased", type=str, required=True,
-                    help="bert-base-uncased, bert-large-uncased")
-parser.add_argument("--batch_size", default=32, type=int)
+parser.add_argument("--BERT", default="bert-base-uncased", type=str, help="bert-base-uncased, bert-large-uncased")
+parser.add_argument("--batch_size", default=16, type=int)
 parser.add_argument("--clip_grad", default=5.0, type=float)
-parser.add_argument("--valid_iters", default=2000, type=int)
-parser.add_argument("--save_path", default='models', type=str)
-parser.add_argument("--log_every", default=10, type=int)
-
-
-
-
-def get_file_paths(directory):
-    files_list = [os.path.join(directory, f) for f in os.listdir(directory) if
-                  os.path.isfile(os.path.join(directory, f))]
-    return files_list
+parser.add_argument("--d_model", default=128, type=int)
+parser.add_argument("--d_int", default=512, type=int)
+parser.add_argument("--dropout", default=0.1, type=float)
+parser.add_argument("--lr", default=0.001, type=float)
+parser.add_argument("--models_path", default='models', type=str)
+parser.add_argument("--seed", default=1515, type=int)
+parser.add_argument("--shuffle", default=True, type=bool)
+parser.add_argument("--log_dir", default='logs', type=str)
+parser.add_argument("--log", default=True, type=bool)
+parser.add_argument("--epochs", default=50, type=int)
+parser.add_argument("--save_every", default=5, type=int)
+parser.add_argument("--n_layers", default=2, type=int)
 
 
 def main(arg_parser):
-    test_dir = os.path.join(arg_parser.data_folder, 'test')
-    train_dir = os.path.join(arg_parser.data_folder, 'train')
-    dev_dir = os.path.join(arg_parser.data_folder, 'dev')
+    pass
 
-    test_file_paths = get_file_paths(test_dir)
+
+def train(arg_parser):
+    train_dataset = get_dataset(arg_parser.data_folder, 'train')
+    test_dataset = get_dataset(arg_parser.data_folder, 'dev')
     vocab = Vocab(arg_parser.BERT)
-    import pdb;
-    pdb.set_trace()
-    # BERT_encoder = BertModel.from_pretrained(arg_parser.BERT,
-    #                                          cache_dir=os.path.join('BERT_pretrained_models', arg_parser.BERT))
+    model = TSP(input_vocab=vocab, target_vocab=vocab, d_model=arg_parser.d_model, d_int=arg_parser.d_model, n_layers=arg_parser.n_layers, dropout_rate=arg_parser.dropout)
+
+    model.train()
+
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    model = model.to(device)
+
+    optimizer = torch.optim.Adam(model.parameters(), lr=arg_parser.lr)
+
     # dataset = read_GeoQuery(file_paths=test_file_paths)
     # with torch.no_grad():
     #     for i, (input_sentences_batch, target_queries_batch) in enumerate(
@@ -44,171 +54,81 @@ def main(arg_parser):
     #         input_tensor = vocab.to_input_tensor(input_sentences_batch, device='cpu')
     #         output_layers, _ = BERT_encoder(input_tensor, output_all_encoded_layers=False)
     #         # output_layers of dim bsize, max_len, 768 or 1024 (base or large)
+    if not os.path.isdir(arg_parser.log_dir):
+        os.makedirs(arg_parser.log_dir)
 
+    summary_writer = SummaryWriter(log_dir=arg_parser.log_dir) if arg_parser.log else None
 
-# def train(arg_parser):
-#     """ Train the NMT Model.
-#     @param args (Dict): args from cmd line
-#     """
-#     train_dir = os.path.join(arg_parser.data_folder, 'train')
-#     train_data = read_GeoQuery(file_paths=get_file_paths(train_dir))
-#
-#     dev_dir = os.path.join(arg_parser.data_folder, 'dev')
-#     dev_data = read_GeoQuery(file_paths=get_file_paths(dev_dir))
-#
-#     test_dir = os.path.join(arg_parser.data_folder, 'test')
-#     test_data = read_GeoQuery(file_paths=get_file_paths(test_dir))
-#
-#     batch_size = arg_parser.batch_size
-#
-#     #TODO adapt default parameters to our problem
-#     clip_grad = arg_parser.clip_grad
-#     valid_niter = arg_parser.valid_iters
-#     log_every = arg_parser.log_every
-#     model_save_path = arg_parser.save_path
-#
-#     vocab = Vocab(arg_parser.BERT)
-#
-#     model = NMT(embed_size=int(args['--embed-size']),
-#                 hidden_size=int(args['--hidden-size']),
-#                 dropout_rate=float(args['--dropout']),
-#                 vocab=vocab, no_char_decoder=args['--no-char-decoder'])
-#     model.train()
-#
-#     uniform_init = float(args['--uniform-init'])
-#     if np.abs(uniform_init) > 0.:
-#         print('uniformly initialize parameters [-%f, +%f]' % (uniform_init, uniform_init), file=sys.stderr)
-#         for p in model.parameters():
-#             p.data.uniform_(-uniform_init, uniform_init)
-#
-#     vocab_mask = torch.ones(len(vocab.tgt))
-#     vocab_mask[vocab.tgt['<pad>']] = 0
-#
-#     device = torch.device("cuda:0" if args['--cuda'] else "cpu")
-#     print('use device: %s' % device, file=sys.stderr)
-#
-#     model = model.to(device)
-#
-#     optimizer = torch.optim.Adam(model.parameters(), lr=float(args['--lr']))
-#
-#     num_trial = 0
-#     train_iter = patience = cum_loss = report_loss = cum_tgt_words = report_tgt_words = 0
-#     cum_examples = report_examples = epoch = valid_num = 0
-#     hist_valid_scores = []
-#     train_time = begin_time = time.time()
-#     print('begin Maximum Likelihood training')
-#
-#     while True:
-#         epoch += 1
-#
-#         for src_sents, tgt_sents in batch_iter(train_data, batch_size=train_batch_size, shuffle=True):
-#             train_iter += 1
-#
-#             optimizer.zero_grad()
-#
-#             batch_size = len(src_sents)
-#
-#             example_losses = -model(src_sents, tgt_sents)  # (batch_size,)
-#             batch_loss = example_losses.sum()
-#             loss = batch_loss / batch_size
-#
-#             loss.backward()
-#
-#             # clip gradient
-#             grad_norm = torch.nn.utils.clip_grad_norm_(model.parameters(), clip_grad)
-#
-#             optimizer.step()
-#
-#             batch_losses_val = batch_loss.item()
-#             report_loss += batch_losses_val
-#             cum_loss += batch_losses_val
-#
-#             tgt_words_num_to_predict = sum(len(s[1:]) for s in tgt_sents)  # omitting leading `<s>`
-#             report_tgt_words += tgt_words_num_to_predict
-#             cum_tgt_words += tgt_words_num_to_predict
-#             report_examples += batch_size
-#             cum_examples += batch_size
-#
-#             if train_iter % log_every == 0:
-#                 print('epoch %d, iter %d, avg. loss %.2f, avg. ppl %.2f ' \
-#                       'cum. examples %d, speed %.2f words/sec, time elapsed %.2f sec' % (epoch, train_iter,
-#                                                                                          report_loss / report_examples,
-#                                                                                          math.exp(
-#                                                                                              report_loss / report_tgt_words),
-#                                                                                          cum_examples,
-#                                                                                          report_tgt_words / (
-#                                                                                                      time.time() - train_time),
-#                                                                                          time.time() - begin_time),
-#                       file=sys.stderr)
-#
-#                 train_time = time.time()
-#                 report_loss = report_tgt_words = report_examples = 0.
-#
-#             # perform validation
-#             if train_iter % valid_niter == 0:
-#                 print('epoch %d, iter %d, cum. loss %.2f, cum. ppl %.2f cum. examples %d' % (epoch, train_iter,
-#                                                                                              cum_loss / cum_examples,
-#                                                                                              np.exp(
-#                                                                                                  cum_loss / cum_tgt_words),
-#                                                                                              cum_examples),
-#                       file=sys.stderr)
-#
-#                 cum_loss = cum_examples = cum_tgt_words = 0.
-#                 valid_num += 1
-#
-#                 print('begin validation ...', file=sys.stderr)
-#
-#                 # compute dev. ppl and bleu
-#                 dev_ppl = evaluate_ppl(model, dev_data, batch_size=128)  # dev batch size can be a bit larger
-#                 valid_metric = -dev_ppl
-#
-#                 print('validation: iter %d, dev. ppl %f' % (train_iter, dev_ppl), file=sys.stderr)
-#
-#                 is_better = len(hist_valid_scores) == 0 or valid_metric > max(hist_valid_scores)
-#                 hist_valid_scores.append(valid_metric)
-#
-#                 if is_better:
-#                     patience = 0
-#                     print('save currently the best model to [%s]' % model_save_path, file=sys.stderr)
-#                     model.save(model_save_path)
-#
-#                     # also save the optimizers' state
-#                     torch.save(optimizer.state_dict(), model_save_path + '.optim')
-#                 elif patience < int(args['--patience']):
-#                     patience += 1
-#                     print('hit patience %d' % patience, file=sys.stderr)
-#
-#                     if patience == int(args['--patience']):
-#                         num_trial += 1
-#                         print('hit #%d trial' % num_trial, file=sys.stderr)
-#                         if num_trial == int(args['--max-num-trial']):
-#                             print('early stop!', file=sys.stderr)
-#                             exit(0)
-#
-#                         # decay lr, and restore from previously best checkpoint
-#                         lr = optimizer.param_groups[0]['lr'] * float(args['--lr-decay'])
-#                         print('load previously best model and decay learning rate to %f' % lr, file=sys.stderr)
-#
-#                         # load model
-#                         params = torch.load(model_save_path, map_location=lambda storage, loc: storage)
-#                         model.load_state_dict(params['state_dict'])
-#                         model = model.to(device)
-#
-#                         print('restore parameters of the optimizers', file=sys.stderr)
-#                         optimizer.load_state_dict(torch.load(model_save_path + '.optim'))
-#
-#                         # set new lr
-#                         for param_group in optimizer.param_groups:
-#                             param_group['lr'] = lr
-#
-#                         # reset patience
-#                         patience = 0
-#
-#             if epoch == int(args['--max-epoch']):
-#                 print('reached maximum number of epochs!', file=sys.stderr)
-#                 exit(0)
-#
+    n_train = len(train_dataset)
+    n_test = len(test_dataset)
+
+    for epoch in range(arg_parser.epochs):
+        running_loss = 0.0
+        last_log_time = time.time()
+
+        # Training
+        train_loss = 0.0
+        for batch_idx, batch_examples in enumerate(
+                data_iterator(train_dataset, batch_size=arg_parser.batch_size, shuffle=arg_parser.shuffle)):
+            if ((batch_idx % 100) == 0) and batch_idx > 1:
+                print("epoch {} | batch {} | mean running loss {:.2f} | {:.2f} batch/s".format(epoch, batch_idx,
+                                                                                               math.sqrt(
+                                                                                                   running_loss / 100),
+                                                                                               100 / (
+                                                                                                       time.time() - last_log_time)))
+                last_log_time = time.time()
+                running_loss = 0.0
+
+            sources, targets = batch_examples[0], batch_examples[1]
+            example_losses = -model(sources, targets)  # (batch_size,)
+            batch_loss = example_losses.sum()
+            loss = batch_loss / arg_parser.batch_size
+
+            # clip gradient
+            grad_norm = torch.nn.utils.clip_grad_norm_(model.parameters(), arg_parser.clip_grad)
+
+            if batch_idx % 100 == 0:
+                print("{:.2f}".format(loss))
+
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+
+            # add loss
+            running_loss += loss.item()
+            train_loss += loss.item()
+
+        print("Epoch train loss : {}".format(math.sqrt(train_loss / math.ceil(n_train / arg_parser.batch_size))))
+
+        if summary_writer is not None:
+            summary_writer.add_scalar("train/loss",
+                                      math.sqrt(train_loss / math.ceil(n_train / arg_parser.batch_size)),
+                                      global_step=epoch)
+        if (epoch % arg_parser.save_every == 0) and arg_parser.log and epoch > 0:
+            save_model(arg_parser.models_path, "{}_epoch_{}.pt".format('TSP', epoch), model,
+                       device)
+        ## TEST
+        test_loss = 0.0
+
+        for batch_idx, batch_examples in enumerate(
+                data_iterator(test_dataset, batch_size=arg_parser.batch_size,
+                              shuffle=arg_parser.shuffle)):
+            with torch.no_grad():
+                sources, targets = batch_examples[0], batch_examples[1]
+                example_losses = -model(sources, targets)  # (batch_size,)
+                batch_loss = example_losses.sum()
+                loss = batch_loss / arg_parser.batch_size
+
+                test_loss += loss.item()
+
+        if summary_writer is not None:
+            summary_writer.add_scalar("test/loss", math.sqrt(test_loss / math.ceil(n_test) / arg_parser.batch_size),
+                                      global_step=epoch)
+        print("TEST loss | epoch {} | {:.2f}".format(epoch, math.sqrt(
+            test_loss / math.ceil(n_test / arg_parser.batch_size))))
+
+    return None
 
 if __name__ == '__main__':
     args = parser.parse_args()
-    main(args)
+    train(args)

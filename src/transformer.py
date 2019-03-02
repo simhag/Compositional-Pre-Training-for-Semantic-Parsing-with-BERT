@@ -10,6 +10,7 @@ import torch.nn.functional as F
 from utils import clones
 from sublayers import FeedForward, MultiHeadAttention
 
+
 class DecoderLayer(nn.Module):
     '''
     Define the DecoderLayer, composed of:
@@ -17,60 +18,58 @@ class DecoderLayer(nn.Module):
         - MultiHead2 Attention linked to the output of Encoder + MultiHead1
         - FFN linked to MultiHead2
     '''
-    def __init__(self, d_model = 512, d_int = 2048, d_k = 64, d_v = 64, h = 8, p_drop = 0.1):
-        
-        super(DecoderLayer, self).__init__()
-        
-        self.MultiHead1 = MultiHeadAttention(h = h, d_k = d_k, d_model = d_model, p_drop = p_drop)
-        self.MultiHead2 = MultiHeadAttention(h = h, d_k = d_k, d_model = d_model, p_drop = p_drop)
-        self.ffn = FeedForward(dim_in_out = d_model, dim_int = d_int, p_drop = p_drop)
 
-    def forward(self, input_dec, output_enc, multihead1_mask = None, multihead2_mask = None):
+    def __init__(self, d_model=512, d_int=2048, d_k=64, d_v=64, h=8, p_drop=0.1):
+        super(DecoderLayer, self).__init__()
+
+        self.MultiHead1 = MultiHeadAttention(h=h, d_k=d_k, d_model=d_model, p_drop=p_drop)
+        self.MultiHead2 = MultiHeadAttention(h=h, d_k=d_k, d_model=d_model, p_drop=p_drop)
+        self.ffn = FeedForward(dim_in_out=d_model, dim_int=d_int, p_drop=p_drop)
+
+    def forward(self, input_dec, output_enc, multihead1_mask=None, multihead2_mask=None):
         # Multiheadmask set as None by default: to be changed !!!
- 
-        out_head1 = self.MultiHead1(Q = input_dec, K = input_dec, V = input_dec, mask = multihead1_mask)
-        out_head2 = self.MultiHead2(Q = out_head1, K = output_enc, V = output_enc, mask = multihead2_mask)
+
+        out_head1 = self.MultiHead1(Q=input_dec, K=input_dec, V=input_dec, mask=multihead1_mask)
+        out_head2 = self.MultiHead2(Q=out_head1, K=output_enc, V=output_enc, mask=multihead2_mask)
 
         final_output = self.ffn(out_head2)
         # MASK IN UTILS --> black right i
         # pad_mask + multihead_mask
         return final_output
 
+
 class Transformer(nn.Module):
     '''
     Generate Decoder, composed of Nx DecoderLayer
     '''
-    def __init__(self, layer, n_layer = 6):
 
+    def __init__(self, layer, n_layer=6):
         super(Transformer, self).__init__()
-        self.layers_decoder = clones(module = layer, N = n_layer)
+        self.layers_decoder = clones(module=layer, N=n_layer)
 
-    def forward(self, input_dec, output_enc):
-
+    def forward(self, input_dec, output_enc, multihead1_mask=None, multihead2_mask=None):
         for layer in self.layers_decoder:
-            input_dec = layer(input_dec = input_dec, output_enc = output_enc)
-            # ATTENTION: ADD MASK
+            input_dec = layer(input_dec=input_dec, output_enc=output_enc, multihead1_mask=multihead1_mask, multihead2_mask=multihead2_mask)
         return input_dec
 
 
 class EncoderLayer(nn.Module):
-	'''
+    '''
     Define the EncoderLayer, composed of:
         - MultiHead Attention linked to the input of the Encoder
         - FFN linked to MultiHead
     '''
 
-    def __init__(self, d_model = 512, d_int = 2048, d_k = 64, d_v = 64, h = 8, p_drop = 0.1):
-        
+    def __init__(self, d_model=512, d_int=2048, d_k=64, d_v=64, h=8, p_drop=0.1):
         super(EncoderLayer, self).__init__()
-        
-        self.MultiHead = MultiHeadAttention(h = h, d_k = d_k, d_model = d_model, p_drop = p_drop)
-        self.ffn = FeedForward(dim_in_out = d_model, dim_int = d_int, p_drop = p_drop)
 
-    def forward(self, input_enc, multihead_mask = None):
+        self.MultiHead = MultiHeadAttention(h=h, d_k=d_k, d_model=d_model, p_drop=p_drop)
+        self.ffn = FeedForward(dim_in_out=d_model, dim_int=d_int, p_drop=p_drop)
+
+    def forward(self, input_enc, multihead_mask=None):
         # Multiheadmask set as None by default: to be changed !!!
- 
-        out_head = self.MultiHead(Q = input_enc, K = input_enc, V = input_enc, mask = multihead_mask)
+
+        out_head = self.MultiHead(Q=input_enc, K=input_enc, V=input_enc, mask=multihead_mask)
 
         final_output = self.ffn(out_head)
         return final_output
@@ -80,17 +79,17 @@ class TransformerEncoder(nn.Module):
     '''
     Generate Encoder, composed of Nx EncoderLayer
     '''
-    def __init__(self, layer, n_layer = 6):
 
+    def __init__(self, layer, n_layer=6):
         super(TransformerEncoder, self).__init__()
-        self.layers_encoder = clones(module = layer, N = n_layer)
+        self.layers_encoder = clones(module=layer, N=n_layer)
 
-    def forward(self, input_enc):
-
+    def forward(self, input_enc, multihead_mask=None):
         for layer in self.layers_encoder:
-            input_enc = layer(input_enc = input_enc)
+            input_enc = layer(input_enc=input_enc, multihead_mask=multihead_mask)
             # ATTENTION: ADD MASK
         return input_enc
+
 
 '''
 if __name__ == '__main__':
