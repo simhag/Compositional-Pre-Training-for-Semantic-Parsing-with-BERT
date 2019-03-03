@@ -63,7 +63,7 @@ class Domain(object):
 class GeoqueryDomain(Domain):
   DEFAULT_TRAIN_FILE = os.path.join( 
       os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
-      'Git/src/geoQueryData/train/geo880_train100.tsv')
+      './geoQueryData/train/geo880_train100.tsv')
   # PATH TO BE ADAPTED: 
 
   def preprocess_lf(self, lf):
@@ -86,7 +86,9 @@ class GeoqueryDomain(Domain):
   def postprocess_lf(self, lf):
     """Undo the variable name standardization."""
     cur_var = chr(ord('A') - 1)
-    toks = lf.split(' ')
+    #toks = lf.split(' ')
+    toks = lf[0]
+    print(toks)
     new_toks = []
     for w in toks:
       if w == 'NV':
@@ -243,12 +245,12 @@ class GeoqueryDomain(Domain):
 
   def compare_answers(self, true_answers, all_derivs):
     all_lfs = ([self.format_lf(s) for s in true_answers] +
-               [self.format_lf(' '.join(d.y_toks)) 
+               #[self.format_lf(' '.join(d.y_toks)) 
+               [self.format_lf(' '.join(d)) 
                 for x in all_derivs for d in x])
     tf_lines = ['_parse([query], %s).' % lf for lf in all_lfs]
     tf = tempfile.NamedTemporaryFile(suffix='.dlog')
     for line in tf_lines:
-      print(line, file = tf)
       print(line)
     tf.flush()
     msg = subprocess.check_output(['evaluator/geoquery', tf.name])
