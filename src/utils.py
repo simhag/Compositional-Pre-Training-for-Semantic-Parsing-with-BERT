@@ -122,7 +122,7 @@ def save_model(model_path, model_name, model, device):
 
 def load_model(file_path, model):
     dict = torch.load(file_path)
-    model.load_state_dict(dict["semantic_parserz`"])
+    model.load_state_dict(dict["semantic_parser"])
 
 
 def generate_sent_mask(tgt, source_lengths):
