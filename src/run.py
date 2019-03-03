@@ -10,6 +10,7 @@ from tensorboardX import SummaryWriter
 import time
 import math
 import numpy as np
+from tqdm import tqdm
 
 parser = ArgumentParser()
 parser.add_argument("--data_folder", type=str, default="geoQueryData")
@@ -145,24 +146,24 @@ def test(arg_parser):
     model = TSP(input_vocab=vocab, target_vocab=vocab, d_model=arg_parser.d_model, d_int=arg_parser.d_model,
                 n_layers=arg_parser.n_layers, dropout_rate=arg_parser.dropout)
     load_model(file_path=file_path, model=model)
-    evaluation_methods = {'strict': strict_evaluation, 'soft': knowledge_based_evaluation}
+    evaluation_methods = {'strict': dirty_evaluation, 'soft': knowledge_based_evaluation}
 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     model = model.to(device)
 
     parsing_outputs, gold_queries = decoding(model, test_dataset, arg_parser)
 
-    top_parsing_outputs = [parsing_output[0] for parsing_output in parsing_outputs]
-
-    test_accuracy = evaluation_methods[arg_parser.evaluation](top_parsing_outputs, gold_queries)
-    print(
-        f"test accuracy for model {arg_parser.evaluation}_{arg_parser.decoding}_TSP_{arg_parser.epoch_to_load}: {test_accuracy:2f}")
-
-    outfile = os.path.join(arg_parser.data_folder, os.path.join(arg_parser.out_folder,
-                                                                f"{arg_parser.evaluation}_{arg_parser.decoding}_TSP_{arg_parser.epoch_to_load}.txt"))
-    with open(outfile, 'w') as f:
-        for parsing_output in top_parsing_outputs:
-            f.write(parsing_output + '\n')
+    # top_parsing_outputs = [parsing_output[0] for parsing_output in parsing_outputs]
+    #
+    # test_accuracy = evaluation_methods[arg_parser.evaluation](parsing_outputs, gold_queries, vocab)
+    # print(
+    #     f"test accuracy for model {arg_parser.evaluation}_{arg_parser.decoding}_TSP_{arg_parser.epoch_to_load}: {test_accuracy:2f}")
+    #
+    # outfile = os.path.join(arg_parser.data_folder, os.path.join(arg_parser.out_folder,
+    #                                                             f"{arg_parser.evaluation}_{arg_parser.decoding}_TSP_{arg_parser.epoch_to_load}.txt"))
+    # with open(outfile, 'w') as f:
+    #     for parsing_output in parsing_outputs:
+    #         f.write(parsing_output + '\n')
     return None
 
 
@@ -173,12 +174,40 @@ def decoding(loaded_model, test_dataset, arg_parser):
     loaded_model.eval()
     hypotheses = []
     gold_queries = []
+    scores = 0
+    count = 0
     with torch.no_grad():
-        for src_sent_batch, gold_target in data_iterator(test_dataset, batch_size=1, shuffle=False):
-            example_hyps = src_sent_batch#decoding_method(src_sent_batch[0], max_len, beam_size)
+        for src_sent_batch, gold_target in tqdm(data_iterator(test_dataset, batch_size=1, shuffle=False), total=280):
+            example_hyps = decoding_method(sources=src_sent_batch, max_len=max_len, beam_size=beam_size)
             hypotheses.append(example_hyps)
+            gold_tokens_list = loaded_model.target_vocab.to_input_tokens(gold_target)
+            current_score = jaccard(example_hyps[0][1:], gold_tokens_list[0])
+            if current_score == 1:
+                scores += 1
+            count += 1
             gold_queries.append(gold_target[0])
+    print(count)
+    print(f"score obtained is {scores / count:.2f}")
     return hypotheses, gold_queries
+
+
+def jaccard(tokens1, tokens2):
+    set1 = set(tokens1)
+    set2 = set(tokens2)
+    score = len(set1 & set2) / len(set1 | set2)
+    return score
+
+def dirty_evaluation(model_queries, gold_queries, vocab):
+    n = len(model_queries)
+    print(n)
+    gold_tokens_list = vocab.to_input_tokens(gold_queries)
+    assert n == len(gold_queries)
+    score = 0
+    for i in tqdm(range(n)):
+        set1 = set(gold_queries[i])
+        set2 = set(gold_tokens_list[i])
+        score += len(set1 & set2) / len(set1 | set2)
+    return score / n
 
 
 def strict_evaluation(model_queries, gold_queries):

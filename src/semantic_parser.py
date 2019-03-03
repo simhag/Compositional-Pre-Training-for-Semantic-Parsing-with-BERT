@@ -159,45 +159,49 @@ class TSP(nn.Module):
         return self.decoder(input_dec=input_dec, output_enc=output_enc, multihead1_mask=multihead1_mask,
                             multihead2_mask=multihead2_mask)
 
-    def decode_greedy(self, sources, max_len):
-        
+    def decode_greedy(self, sources, max_len, *args, **kwargs):
+
         source_tokens = self.input_vocab.to_input_tokens(sources)
         source_lengths = [len(s) for s in source_tokens]
         source_tensor = self.model_embeddings_source(self.input_vocab.to_input_tensor(sources, device=self.device))
         # feed to Transformer encoder
         input_padding_mask = self.generate_sent_masks(source_tensor, source_lengths)
-        encoder_output = self.encode(source_tensor, padding_mask=input_padding_mask)  # size batch, maxlen, d_model #no mask right? output c'est un tuple?
+        encoder_output = self.encode(source_tensor,
+                                     padding_mask=input_padding_mask)  # size batch, maxlen, d_model #no mask right? output c'est un tuple?
         # use lengths kept in mind to get mask over the encoder output (padding mask)
 
         target_tokens = [['[START]'] for _ in range(source_tensor.size(0))]
-        target_tokens_padded = self.target_vocab.tokens_to_tensor(target_tokens,device=self.device)  # size bsize, max_len
+        target_tokens_padded = self.target_vocab.tokens_to_tensor(target_tokens,
+                                                                  device=self.device)  # size bsize, max_len
         target_tokens_mask = TSP.generate_target_mask(target_tokens_padded, pad_idx=0)  # size bsize, maxlen, maxlen
         # Ready for the decoder with source, its mask, target, its mask
-        
-        for i in range(max_len-1):
-            decoder_output = self.decode(input_dec=self.model_embeddings_target(target_tokens_padded), output_enc=encoder_output,\
-                multihead1_mask=target_tokens_mask, multihead2_mask=input_padding_mask)
+
+        for i in range(max_len - 1):
+            decoder_output = self.decode(input_dec=self.model_embeddings_target(target_tokens_padded),
+                                         output_enc=encoder_output, \
+                                         multihead1_mask=target_tokens_mask, multihead2_mask=input_padding_mask)
 
             P = F.log_softmax(self.linear_projection(decoder_output), dim=-1)
-            print("This is size: \n",P.size())
-            _, next_word = torch.max(P[:,-1], dim = -1)
-            print("This is the next word :\n", next_word)
+            # print("This is size: \n",P.size())
+            _, next_word = torch.max(P[:, -1], dim=-1)
+            # print("This is the next word :\n", next_word)
 
             new_token = self.target_vocab.tokenizer.ids_to_tokens[next_word.item()]
             if new_token == '[END]':
-            	break	
+                break
             target_tokens = [tokens + [new_token] for tokens in target_tokens]
-            target_tokens_padded = self.target_vocab.tokens_to_tensor(target_tokens,device=self.device)
+            target_tokens_padded = self.target_vocab.tokens_to_tensor(target_tokens, device=self.device)
             target_tokens_mask = TSP.generate_target_mask(target_tokens_padded, pad_idx=0)
-            print("This is target_tokens :\n", target_tokens)
-
+            # print("This is target_tokens :\n", target_tokens)
         return target_tokens
+
 
 if __name__ == '__main__':
     vocab = Vocab('bert-base-uncased')
-    tsp = TSP(input_vocab = vocab, target_vocab = vocab)
+    tsp = TSP(input_vocab=vocab, target_vocab=vocab)
     src = ['what is the highest point in florida ?']
     tsp.decode_greedy(src, max_len=80)
+
 
     # def beam_search(self, src_sent: List[str], beam_size: int = 5, max_decoding_time_step: int = 70) -> List[
     #     Hypothesis]:
