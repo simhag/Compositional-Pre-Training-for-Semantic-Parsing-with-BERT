@@ -142,12 +142,26 @@ def get_file_paths(directory):
                   os.path.isfile(os.path.join(directory, f))]
     return files_list
 
+def get_file_paths_finishby(directory, str_end):
+    files_list = [os.path.join(directory, f) for f in os.listdir(directory) if
+                  os.path.isfile(os.path.join(directory, f)) if f.endswith(str_end)]
+    return files_list
 
 def get_dataset(data_folder, set_type):
     filepaths = get_file_paths(os.path.join(data_folder, set_type))
     dataset = read_GeoQuery(file_paths=filepaths)
     return dataset
 
+def get_dataset_finish_by(data_folder, set_type, finish_by):
+    '''
+    finish_by = '600.tsv' / '300.tsv', etc.
+    '''
+    filepaths = get_file_paths_finishby(os.path.join(data_folder, set_type),finish_by)
+    dataset = read_GeoQuery(file_paths=filepaths)
+    return dataset
+
+#if __name__ == '__main__':
+#    print(len(get_dataset_type('geoQueryData','train','300.tsv')))
     # if __name__ == '__main__':
 #     # file_paths = ['geo880_dev100.tsv', 'geo880_test280.tsv', 'geo880_train100.tsv']
 #     # data = read_GeoQuery(['./geoQueryData/' + fpath for fpath in file_paths])

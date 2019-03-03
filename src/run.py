@@ -5,7 +5,7 @@ from utils import read_GeoQuery, data_iterator
 from pytorch_pretrained_bert.modeling import BertModel
 from tokens_vocab import Vocab
 from semantic_parser import TSP, BSP
-from utils import get_dataset, save_model, load_model
+from utils import get_dataset_finish_by, save_model, get_dataset, load_model
 from tensorboardX import SummaryWriter
 import time
 import math
@@ -50,8 +50,8 @@ def main(arg_parser):
 
 
 def train(arg_parser):
-    train_dataset = get_dataset(arg_parser.data_folder, 'train')
-    test_dataset = get_dataset(arg_parser.data_folder, 'dev')
+    train_dataset = get_dataset_finish_by(arg_parser.data_folder, 'train','600.tsv')
+    test_dataset = get_dataset_finish_by(arg_parser.data_folder, 'dev', '100.tsv')
     vocab = Vocab(arg_parser.BERT)
     model = TSP(input_vocab=vocab, target_vocab=vocab, d_model=arg_parser.d_model, d_int=arg_parser.d_model,
                 n_layers=arg_parser.n_layers, dropout_rate=arg_parser.dropout)
