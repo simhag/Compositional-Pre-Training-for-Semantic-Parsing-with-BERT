@@ -139,7 +139,7 @@ def train(arg_parser):
 
 # TODO beam_search and knowledge_based eval
 def test(arg_parser):
-    test_dataset = get_dataset(arg_parser.data_folder, 'test')
+    test_dataset = get_dataset_finish_by(arg_parser.data_folder, 'test','280.tsv')
     vocab = Vocab(arg_parser.BERT)
     file_path = os.path.join(arg_parser.models_path, f"TSP_epoch_{arg_parser.epoch_to_load}.pt")
     model = TSP(input_vocab=vocab, target_vocab=vocab, d_model=arg_parser.d_model, d_int=arg_parser.d_model,
