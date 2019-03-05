@@ -157,10 +157,13 @@ def main():
   domain = domains.new(domain_name)
   if folder == 'train':
     fname = './geoQueryData/train/geo880_train600.tsv'
+    nums_data = 600
   elif folder == 'dev':
     fname = './geoQueryData/dev/geo880_dev100.tsv'
+    nums_data = 100
   elif folder == 'test':
     fname = './geoQueryData/test/geo880_test280.tsv'
+    nums_data = 280
   with open(fname) as f:
     for line in f:
       x, y = line.strip().split('\t')
@@ -168,11 +171,12 @@ def main():
       data.append((x, y))
   augmenter = Augmenter(domain, data, aug_types)
   aug_data = augmenter.sample(num)
-  path = f"./geoQueryData/{folder}/geo880_{folder}_{num}recomb.tsv"
+  path = f"./geoQueryData/{folder}/geo880_{folder}_{num+nums_data}recomb.tsv"
   with open(path, 'w') as f:
+    for data in data:
+      f.write(data[0] + '\t' + data[1] + '\n')
     for ex in aug_data:
       f.write(ex[0] + '\t' + ex[1] + '\n')
-
 
 if __name__ == '__main__':
   main()

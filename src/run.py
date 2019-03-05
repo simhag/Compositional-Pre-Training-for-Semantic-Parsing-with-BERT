@@ -24,12 +24,12 @@ parser.add_argument("--d_int", default=512, type=int)
 parser.add_argument("--dropout", default=0.1, type=float)
 parser.add_argument("--lr", default=0.001, type=float)
 parser.add_argument("--models_path", default='models', type=str)
-parser.add_argument("--epoch_to_load", default=45, type=int)
+parser.add_argument("--epoch_to_load", default=45, type=int) #TO BE CHECKED
 parser.add_argument("--seed", default=1515, type=int)
 parser.add_argument("--shuffle", default=True, type=bool)
 parser.add_argument("--log_dir", default='logs', type=str)
 parser.add_argument("--log", default=True, type=bool)
-parser.add_argument("--epochs", default=50, type=int)
+parser.add_argument("--epochs", default=200, type=int)
 parser.add_argument("--save_every", default=5, type=int)
 parser.add_argument("--n_layers", default=2, type=int)
 parser.add_argument("--decoding", default='beam_search', type=str)
@@ -51,9 +51,9 @@ def main(arg_parser):
     return
 
 
-def train(arg_parser):
-    train_dataset = get_dataset_finish_by(arg_parser.data_folder, 'train', '600.tsv')
-    test_dataset = get_dataset_finish_by(arg_parser.data_folder, 'dev', '100.tsv')
+def train(arg_parser): 
+    train_dataset = get_dataset_finish_by(arg_parser.data_folder, 'train', '600.tsv') # TO BE CHANGED FOR RECOMB
+    test_dataset = get_dataset_finish_by(arg_parser.data_folder, 'dev', '100.tsv') # TO BE CHANGED FOR RECOMB
     vocab = Vocab(arg_parser.BERT)
     model = TSP(input_vocab=vocab, target_vocab=vocab, d_model=arg_parser.d_model, d_int=arg_parser.d_model,
                 n_layers=arg_parser.n_layers, dropout_rate=arg_parser.dropout)
@@ -116,7 +116,7 @@ def train(arg_parser):
                                       global_step=epoch)
         if (epoch % arg_parser.save_every == 0) and arg_parser.log and epoch > 0:
             save_model(arg_parser.models_path, "{}_epoch_{}.pt".format('TSP', epoch), model,
-                       device)
+                       device) # TO BE CHANGED FOR RECOMB
         ## TEST
         test_loss = 0.0
 
