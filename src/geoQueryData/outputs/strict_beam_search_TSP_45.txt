@@ -1,0 +1,5 @@
+_answer(a,(_state(a),_smallest(b,_state(a))))
+_answer(a,_longest(a,(_river(a),_lo##c(a,b),_con##st(b,_country##id(usa)))))
+_answer(a,_highest(a,(_place(a),_lo##c(a,b),_state(b),_population(b,a))))
+_answer(a,(_major(a),_river(a),_lo##c(a,b),_con##st(b,_state##id(ohio))))
+_answer(a,(_major(a),_river(a),_lo##c(a,b),_con##st(b,_state##id(florida))))

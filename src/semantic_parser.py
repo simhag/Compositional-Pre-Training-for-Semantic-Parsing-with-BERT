@@ -7,7 +7,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.nn.utils
 from BERT_encoder import BERT
-from tokens_vocab import Vocab #for debugging
+from tokens_vocab import Vocab  # for debugging
 from tokens_embeddings import DecoderEmbeddings, PositionalEncoding
 from torch.autograd import Variable
 from transformer import Transformer, DecoderLayer, TransformerEncoder, EncoderLayer
@@ -157,7 +157,13 @@ class TSP(nn.Module):
                             multihead2_mask=multihead2_mask)
 
     def decode_greedy(self, sources, max_len, *args, **kwargs):
-
+        """
+        :param sources: [ str ] str is the input test example to encode-decode
+        :param max_len: max len -in tokens of the input
+        :param args:
+        :param kwargs:
+        :return:list[str] list of the list of tokens for the decoded query
+        """
         source_tokens = self.input_vocab.to_input_tokens(sources)
         source_lengths = [len(s) for s in source_tokens]
         source_tensor = self.model_embeddings_source(self.input_vocab.to_input_tensor(sources, device=self.device))
@@ -179,9 +185,7 @@ class TSP(nn.Module):
                                          multihead1_mask=target_tokens_mask, multihead2_mask=input_padding_mask)
 
             P = F.log_softmax(self.linear_projection(decoder_output), dim=-1)
-            # print("This is size: \n",P.size())
             _, next_word = torch.max(P[:, -1], dim=-1)
-            # print("This is the next word :\n", next_word)
 
             new_token = self.target_vocab.tokenizer.ids_to_tokens[next_word.item()]
             if new_token == '[END]':
@@ -189,10 +193,9 @@ class TSP(nn.Module):
             target_tokens = [tokens + [new_token] for tokens in target_tokens]
             target_tokens_padded = self.target_vocab.tokens_to_tensor(target_tokens, device=self.device)
             target_tokens_mask = TSP.generate_target_mask(target_tokens_padded, pad_idx=0)
-            # print("This is target_tokens :\n", target_tokens)
-        return target_tokens
+        return [target_token[1:] for target_token in target_tokens]
 
-    def beam_search(self, src_sent, beam_size, max_decoding_time_step):
+    def beam_search(self, src_sent, beam_size, max_len):
         len_vocab = len(self.input_vocab.tokenizer.ids_to_tokens)
 
         source_tokens = self.input_vocab.to_input_tokens(src_sent)
@@ -202,8 +205,6 @@ class TSP(nn.Module):
         input_padding_mask = self.generate_sent_masks(source_tensor, source_lengths)
         encoder_output = self.encode(source_tensor, padding_mask=input_padding_mask)  # size 1, maxlen, d_model
 
-        target_tokens = [['[START]'] for _ in range(source_tensor.size(0))]
-
         hypotheses = [['[START]']]
         hyp_scores = torch.zeros(len(hypotheses), dtype=torch.float, device=self.device)
         len_hyps = [1]
@@ -212,7 +213,7 @@ class TSP(nn.Module):
         completed_hypotheses = []
 
         t = 0
-        while len(completed_hypotheses) < beam_size and t < max_decoding_time_step:
+        while len(completed_hypotheses) < beam_size and t < max_len:
             t += 1
             hyp_num = len(hypotheses)
 
@@ -223,12 +224,13 @@ class TSP(nn.Module):
                                          multihead2_mask=input_padding_mask)
 
             P = F.log_softmax(self.linear_projection(decoder_output), dim=-1)  # size hyp_num, max_len, len_vocab
-            updates = [P[i, len_i - 1, :] for i, len_i in enumerate(len_hyps)] # n_hyp tensors of size len_vocab
+            updates = [P[i, len_i - 1, :] for i, len_i in enumerate(len_hyps)]  # n_hyp tensors of size len_vocab
             score_updates = torch.stack(updates)
-            continuating_scores = (hyp_scores.unsqueeze(1).expand_as(score_updates) + score_updates).view(-1) #size n_hyp x vocab
+            continuating_scores = (hyp_scores.unsqueeze(1).expand_as(score_updates) + score_updates).view(
+                -1)  # size n_hyp x vocab
             top_scores, top_positions = torch.topk(continuating_scores, k=beam_size)
-            prev_hyp_ids = top_positions / len_vocab
-            hyp_word_ids = top_scores % len_vocab
+            prev_hyp_ids = top_positions // len_vocab
+            hyp_word_ids = top_positions % len_vocab
 
             new_hypotheses = []
             new_len_hyps = []
@@ -239,11 +241,11 @@ class TSP(nn.Module):
                 hyp_word_id = hyp_word_id.item()
                 cand_new_hyp_score = cand_new_hyp_score.item()
 
-                hyp_token = self.vocab.tokenizer.ids_to_tokens[hyp_word_id]
+                hyp_token = self.input_vocab.tokenizer.ids_to_tokens[int(hyp_word_id)]
 
                 new_hyp_sent = hypotheses[prev_hyp_id] + [hyp_token]
                 if hyp_token == '[END]':
-                    completed_hypotheses.append(Hypothesis(value=new_hyp_sent[1:-1], #on jerte le start et le end
+                    completed_hypotheses.append(Hypothesis(value=new_hyp_sent[1:-1],  # on jerte le start et le end
                                                            score=cand_new_hyp_score))
                 else:
                     new_hypotheses.append(new_hyp_sent)
@@ -260,7 +262,7 @@ class TSP(nn.Module):
             hyp_tokens_mask = TSP.generate_target_mask(hypotheses_padded, pad_idx=0)
 
         completed_hypotheses.sort(key=lambda hyp: hyp.score, reverse=True)
-        return completed_hypotheses[:beam_size]
+        return [hyp.value for hyp in completed_hypotheses[:beam_size]]
 
 
 if __name__ == '__main__':
@@ -400,6 +402,7 @@ class BSP(nn.Module):
         """
         return self.decoder(target_padded, encoder_output, multihead1_mask=enc_masks,
                             multihead2_mask=target_padded_mask)
+
     @property
     def device(self) -> torch.device:
         """ Determine which device to place the Tensors upon, CPU or GPU.
