@@ -156,17 +156,17 @@ class TSP(nn.Module):
         return self.decoder(input_dec=input_dec, output_enc=output_enc, multihead1_mask=multihead1_mask,
                             multihead2_mask=multihead2_mask)
 
-    def decode_greedy(self, sources, max_len, *args, **kwargs):
+    def decode_greedy(self, src_sent, max_len, *args, **kwargs):
         """
-        :param sources: [ str ] str is the input test example to encode-decode
+        :param src_sent: [ str ] str is the input test example to encode-decode
         :param max_len: max len -in tokens of the input
         :param args:
         :param kwargs:
         :return:list[str] list of the list of tokens for the decoded query
         """
-        source_tokens = self.input_vocab.to_input_tokens(sources)
+        source_tokens = self.input_vocab.to_input_tokens(src_sent)
         source_lengths = [len(s) for s in source_tokens]
-        source_tensor = self.model_embeddings_source(self.input_vocab.to_input_tensor(sources, device=self.device))
+        source_tensor = self.model_embeddings_source(self.input_vocab.to_input_tensor(src_sent, device=self.device))
         # feed to Transformer encoder
         input_padding_mask = self.generate_sent_masks(source_tensor, source_lengths)
         encoder_output = self.encode(source_tensor,
@@ -213,7 +213,7 @@ class TSP(nn.Module):
         completed_hypotheses = []
 
         t = 0
-        while len(completed_hypotheses) < beam_size and t < max_len:
+        while len(completed_hypotheses) < 2 * beam_size and t < max_len:
             t += 1
             hyp_num = len(hypotheses)
 
@@ -252,12 +252,17 @@ class TSP(nn.Module):
                     new_len_hyps.append(len_hyps[prev_hyp_id] + 1)
                     new_hyp_scores.append(cand_new_hyp_score)
 
-            if len(completed_hypotheses) == beam_size:
+            if len(completed_hypotheses) >= 2 * beam_size:
                 break
 
-            hypotheses = new_hypotheses
-            len_hyps = new_len_hyps
-            hyp_scores = torch.tensor(new_hyp_scores, dtype=torch.float, device=self.device)
+            if len(new_hypotheses) == 0:
+                hypotheses = [['[START]']]
+                hyp_scores = torch.zeros(len(hypotheses), dtype=torch.float, device=self.device)
+                len_hyps = [1]
+            else:
+                hypotheses = new_hypotheses
+                len_hyps = new_len_hyps
+                hyp_scores = torch.tensor(new_hyp_scores, dtype=torch.float, device=self.device)
             hypotheses_padded = self.target_vocab.tokens_to_tensor(hypotheses, device=self.device)
             hyp_tokens_mask = TSP.generate_target_mask(hypotheses_padded, pad_idx=0)
 

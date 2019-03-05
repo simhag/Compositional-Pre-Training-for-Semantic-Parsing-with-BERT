@@ -155,10 +155,10 @@ def test(arg_parser):
         test_accuracy = eval_method(parsing_outputs, gold_queries)
         print(f"evaluation method is {eval_name}")
         print(
-            f"test accuracy, model {arg_parser.evaluation}_{arg_parser.decoding}_TSP_{arg_parser.epoch_to_load}: {test_accuracy:2f}")
+            f"test accuracy, model {eval_name}_{arg_parser.decoding}_TSP_{arg_parser.epoch_to_load}: {test_accuracy:2f}")
 
     outfile = os.path.join(arg_parser.data_folder, os.path.join(arg_parser.out_folder,
-                                                                f"{arg_parser.evaluation}_{arg_parser.decoding}_TSP_{arg_parser.epoch_to_load}.txt"))
+                                                                f"{eval_name}_{arg_parser.decoding}_TSP_{arg_parser.epoch_to_load}.txt"))
     with open(outfile, 'w') as f:
         for parsing_output in parsing_outputs:
             f.write(''.join(parsing_output) + '\n')
