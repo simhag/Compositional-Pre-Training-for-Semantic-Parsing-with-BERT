@@ -2,7 +2,7 @@ from pytorch_pretrained_bert.tokenization import BertTokenizer
 from utils import pad_ids_sequences
 from utils import get_dataset, get_dataset_finish_by
 import torch
-
+import warnings
 
 class Vocab(object):
     def __init__(self, BERT_model):
@@ -22,7 +22,7 @@ class Vocab(object):
         """
         for sequence in input_strings_sequences:
             if '[UNK]' in self.tokenizer.tokenize(sequence):
-            	raise Exception('[UNK] in target sequence tokenization: You need to add the corresponding items to the vocabulary')
+            	warnings.warn('[UNK] in target sequence tokenization: You need to add the corresponding items to the vocabulary')
         token_sequences = [self.tokenizer.tokenize(sequence) for sequence in input_strings_sequences]
         token_ids_sequences = [self.tokenizer.convert_tokens_to_ids(tokens) for tokens in token_sequences]
         padded_ids_sequences = pad_ids_sequences(token_ids_sequences)
