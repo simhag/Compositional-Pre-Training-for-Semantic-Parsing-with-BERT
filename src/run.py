@@ -36,6 +36,7 @@ parser.add_argument("--decoding", default='beam_search', type=str)
 parser.add_argument("--beam_size", default=5, type=int)
 parser.add_argument("--max_decode_len", default=105, type=int)
 parser.add_argument("--domain", default='geoquery', type=str)
+parser.add_argument("--recombination", default='', type=str)
 
 
 def main(arg_parser):
@@ -51,7 +52,7 @@ def main(arg_parser):
     return
 
 
-def train(arg_parser): 
+def train(arg_parser):
     train_dataset = get_dataset_finish_by(arg_parser.data_folder, 'train', '600.tsv') # TO BE CHANGED FOR RECOMB
     test_dataset = get_dataset_finish_by(arg_parser.data_folder, 'dev', '100.tsv') # TO BE CHANGED FOR RECOMB
     vocab = Vocab(arg_parser.BERT)
