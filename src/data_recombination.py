@@ -1,7 +1,7 @@
 '''
 Define class that executes the data recombination
-To be called: python data_recombination.py [file] [domain] [aug-type] [num]
-  where [file] = path
+To be called: python data_recombination.py [folder] [domain] [aug-type] [num]
+  where [folder] = {train, dev, test}
         [domain] = {geoquery, artificial}
         [aug_type] = {entity, nesting, concatk}
         [num] = # of data samples to be generated
@@ -19,6 +19,7 @@ import collections
 import random
 import re
 import sys
+from utils import get_dataset_finish_by
 
 import domains
 from grammar import Grammar
@@ -147,13 +148,19 @@ class Augmenter():
 def main():
   """Print augmented data to stdout."""
   if len(sys.argv) < 5:
-    print('Usage: %s [file] [domain] [aug-type] [num]' % sys.argv[0], file = sys.stderr)
+    print('Usage: %s [folder] [domain] [aug-type] [num]' % sys.argv[0], file = sys.stderr)
     sys.exit(1)
-  fname, domain_name, aug_type_str, num = sys.argv[1:5]
+  folder, domain_name, aug_type_str, num = sys.argv[1:5]
   num = int(num)
   aug_types = aug_type_str.split('+')
   data = []
   domain = domains.new(domain_name)
+  if folder == 'train':
+    fname = './geoQueryData/train/geo880_train600.tsv'
+  elif folder == 'dev':
+    fname = './geoQueryData/dev/geo880_dev100.tsv'
+  elif folder == 'test':
+    fname = './geoQueryData/test/geo880_test280.tsv'
   with open(fname) as f:
     for line in f:
       x, y = line.strip().split('\t')
@@ -161,8 +168,11 @@ def main():
       data.append((x, y))
   augmenter = Augmenter(domain, data, aug_types)
   aug_data = augmenter.sample(num)
-  for ex in aug_data:
-    print('\t'.join(ex))
+  path = f"./geoQueryData/{folder}/geo880_{folder}_{num}recomb.tsv"
+  with open(path, 'w') as f:
+    for ex in aug_data:
+      f.write(ex[0] + '\t' + ex[1] + '\n')
+
 
 if __name__ == '__main__':
   main()
