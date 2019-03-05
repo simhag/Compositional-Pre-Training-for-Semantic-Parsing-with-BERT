@@ -12,7 +12,6 @@ class Vocab(object):
         self.tokenizer.vocab['[START]'] = 1
         self.tokenizer.vocab['[END]'] = 2
         self.tokenizer.ids_to_tokens[2] = '[END]'
-        # self.tokenizer.ids_to_tokens[3] = '</s>'
 
     def to_input_tensor(self, input_strings_sequences, device):
         """
@@ -22,7 +21,7 @@ class Vocab(object):
         """
         for sequence in input_strings_sequences:
             if '[UNK]' in self.tokenizer.tokenize(sequence):
-            	warnings.warn('[UNK] in target sequence tokenization: You need to add the corresponding items to the vocabulary')
+                warnings.warn('[UNK] in target sequence tokenization: You need to add the corresponding items to the vocabulary')
         token_sequences = [self.tokenizer.tokenize(sequence) for sequence in input_strings_sequences]
         token_ids_sequences = [self.tokenizer.convert_tokens_to_ids(tokens) for tokens in token_sequences]
         padded_ids_sequences = pad_ids_sequences(token_ids_sequences)
@@ -35,11 +34,10 @@ class Vocab(object):
         token_ids_sequences = [self.tokenizer.convert_tokens_to_ids(tokens) for tokens in input_tokens_sequences]
         padded_ids_sequences = pad_ids_sequences(token_ids_sequences)
         return torch.tensor(padded_ids_sequences, dtype=torch.long, device=device)
-'''
+
 if __name__ == '__main__':
-	train_dataset = get_dataset_finish_by('geoQueryData', 'train','600.tsv')
-	vocab = Vocab('bert-base-uncased')
-	print(len(train_dataset))
-	target = [train_dataset[i][1] for i in range(len(train_dataset))]
-	print(vocab.to_input_tensor(target, device = 'cpu'))
-'''
+    vocab = Vocab('bert-base-uncased')
+    for id, token in vocab.tokenizer.ids_to_tokens.items():
+        if token == '[UNK]':
+            print(id)
+    print(vocab.tokenizer.ids_to_tokens[100])
