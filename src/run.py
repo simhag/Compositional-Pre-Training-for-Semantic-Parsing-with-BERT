@@ -39,6 +39,7 @@ parser.add_argument("--domain", default='geoquery', type=str)
 parser.add_argument("--recombination", default='', type=str)
 
 
+#TODO more proper management of different datasets and BSP / TSP split
 def main(arg_parser):
     # seed the random number generators
     seed = arg_parser.seed
@@ -53,8 +54,15 @@ def main(arg_parser):
 
 
 def train(arg_parser):
-    train_dataset = get_dataset_finish_by(arg_parser.data_folder, 'train', '600.tsv') # TO BE CHANGED FOR RECOMB
-    test_dataset = get_dataset_finish_by(arg_parser.data_folder, 'dev', '100.tsv') # TO BE CHANGED FOR RECOMB
+    recombination = arg_parser.recombination
+    if len(recombination) > 0:
+        train_dataset = get_dataset_finish_by(arg_parser.data_folder, 'train', f"{recombination}_recomb.tsv")
+        test_dataset = get_dataset_finish_by(arg_parser.data_folder, 'dev', f"{recombination}_recomb.tsv")
+        file_name_epoch_indep = f"TSP_recomb_{recombination}"
+    else:
+        train_dataset = get_dataset_finish_by(arg_parser.data_folder, 'train', '600.tsv')
+        test_dataset = get_dataset_finish_by(arg_parser.data_folder, 'dev', '100.tsv')
+        file_name_epoch_indep = "TSP"
     vocab = Vocab(arg_parser.BERT)
     model = TSP(input_vocab=vocab, target_vocab=vocab, d_model=arg_parser.d_model, d_int=arg_parser.d_model,
                 n_layers=arg_parser.n_layers, dropout_rate=arg_parser.dropout)
@@ -116,8 +124,8 @@ def train(arg_parser):
                                       train_loss / math.ceil(n_train / arg_parser.batch_size),
                                       global_step=epoch)
         if (epoch % arg_parser.save_every == 0) and arg_parser.log and epoch > 0:
-            save_model(arg_parser.models_path, "{}_epoch_{}.pt".format('TSP', epoch), model,
-                       device) # TO BE CHANGED FOR RECOMB
+            save_model(arg_parser.models_path, f"{file_name_epoch_indep}_epoch_{epoch}.pt", model,
+                       device)
         ## TEST
         test_loss = 0.0
 
@@ -141,9 +149,16 @@ def train(arg_parser):
 
 
 def test(arg_parser):
-    test_dataset = get_dataset_finish_by(arg_parser.data_folder, 'test', '280.tsv')
+    recombination = arg_parser.recombination
+    if len(recombination) > 0:
+        test_dataset = get_dataset_finish_by(arg_parser.data_folder, 'test', f"{recombination}_recomb.tsv")
+        file_name_epoch_indep = f"TSP_recomb_{recombination}"
+    else:
+        test_dataset = get_dataset_finish_by(arg_parser.data_folder, 'test', '280.tsv')
+        file_name_epoch_indep = "TSP"
+
     vocab = Vocab(arg_parser.BERT)
-    file_path = os.path.join(arg_parser.models_path, f"TSP_epoch_{arg_parser.epoch_to_load}.pt")
+    file_path = os.path.join(arg_parser.models_path, f"{file_name_epoch_indep}_epoch_{arg_parser.epoch_to_load}.pt")
     model = TSP(input_vocab=vocab, target_vocab=vocab, d_model=arg_parser.d_model, d_int=arg_parser.d_model,
                 n_layers=arg_parser.n_layers, dropout_rate=arg_parser.dropout)
     load_model(file_path=file_path, model=model)
