@@ -63,9 +63,8 @@ class Domain(object):
 class GeoqueryDomain(Domain):
   DEFAULT_TRAIN_FILE = os.path.join( 
       os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
-      './geoQueryData/train/geo880_train100.tsv')
-  # PATH TO BE ADAPTED: 
-
+      './geoQueryData/train/geo880_train600.tsv')
+  
   def preprocess_lf(self, lf):
     """Standardize variable names with De Brujin indices."""
     cur_vars = []
@@ -86,9 +85,7 @@ class GeoqueryDomain(Domain):
   def postprocess_lf(self, lf):
     """Undo the variable name standardization."""
     cur_var = chr(ord('A') - 1)
-    #toks = lf.split(' ')
-    toks = lf[0]
-    print(toks)
+    toks = lf.split(' ')
     new_toks = []
     for w in toks:
       if w == 'NV':

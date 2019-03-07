@@ -24,7 +24,7 @@ parser.add_argument("--d_int", default=512, type=int)
 parser.add_argument("--dropout", default=0.1, type=float)
 parser.add_argument("--lr", default=0.001, type=float)
 parser.add_argument("--models_path", default='models', type=str)
-parser.add_argument("--epoch_to_load", default=45, type=int) #TO BE CHECKED
+parser.add_argument("--epoch_to_load", default=195, type=int) #160 for entity, 185 for nesting
 parser.add_argument("--seed", default=1515, type=int)
 parser.add_argument("--shuffle", default=True, type=bool)
 parser.add_argument("--log_dir", default='logs', type=str)
@@ -32,11 +32,11 @@ parser.add_argument("--log", default=True, type=bool)
 parser.add_argument("--epochs", default=200, type=int)
 parser.add_argument("--save_every", default=5, type=int)
 parser.add_argument("--n_layers", default=2, type=int)
-parser.add_argument("--decoding", default='beam_search', type=str)
+parser.add_argument("--decoding", default='beam_search', type=str) # greedy by default
 parser.add_argument("--beam_size", default=5, type=int)
-parser.add_argument("--max_decode_len", default=105, type=int)
+parser.add_argument("--max_decode_len", default=250, type=int)
 parser.add_argument("--domain", default='geoquery', type=str)
-parser.add_argument("--recombination", default='', type=str)
+parser.add_argument("--recombination", default='nesting', type=str)
 
 
 def main(arg_parser):
@@ -53,8 +53,15 @@ def main(arg_parser):
 
 
 def train(arg_parser):
-    train_dataset = get_dataset_finish_by(arg_parser.data_folder, 'train', '600.tsv') # TO BE CHANGED FOR RECOMB
-    test_dataset = get_dataset_finish_by(arg_parser.data_folder, 'dev', '100.tsv') # TO BE CHANGED FOR RECOMB
+    if arg_parser.recombination == 'entity':
+        train_dataset = get_dataset_finish_by(arg_parser.data_folder, 'train', '1200_entity_recomb.tsv') # TO BE CHANGED FOR RECOMB
+        test_dataset = get_dataset_finish_by(arg_parser.data_folder, 'dev', '200_entity_recomb.tsv') # TO BE CHANGED FOR RECOMB
+    elif arg_parser.recombination == 'nesting':
+        train_dataset = get_dataset_finish_by(arg_parser.data_folder, 'train', '1200_nesting_recomb.tsv') # TO BE CHANGED FOR RECOMB
+        test_dataset = get_dataset_finish_by(arg_parser.data_folder, 'dev', '200_nesting_recomb.tsv') # TO BE CHANGED FOR RECOMB
+    elif arg_parser.recombination == '':
+        train_dataset = get_dataset_finish_by(arg_parser.data_folder, 'train', '600.tsv') # TO BE CHANGED FOR RECOMB
+        test_dataset = get_dataset_finish_by(arg_parser.data_folder, 'dev', '100.tsv') # TO BE CHANGED FOR RECOMB
     vocab = Vocab(arg_parser.BERT)
     model = TSP(input_vocab=vocab, target_vocab=vocab, d_model=arg_parser.d_model, d_int=arg_parser.d_model,
                 n_layers=arg_parser.n_layers, dropout_rate=arg_parser.dropout)
@@ -141,9 +148,9 @@ def train(arg_parser):
 
 
 def test(arg_parser):
-    test_dataset = get_dataset_finish_by(arg_parser.data_folder, 'test', '280.tsv')
+    test_dataset = get_dataset_finish_by(arg_parser.data_folder, 'test', '280_entity_recomb.tsv')
     vocab = Vocab(arg_parser.BERT)
-    file_path = os.path.join(arg_parser.models_path, f"TSP_epoch_{arg_parser.epoch_to_load}.pt")
+    file_path = os.path.join(arg_parser.models_path, f"TSP_epoch_{arg_parser.epoch_to_load}_2nd.pt") # TO BE CHANGED FOR RECOMB
     model = TSP(input_vocab=vocab, target_vocab=vocab, d_model=arg_parser.d_model, d_int=arg_parser.d_model,
                 n_layers=arg_parser.n_layers, dropout_rate=arg_parser.dropout)
     load_model(file_path=file_path, model=model)
@@ -311,5 +318,5 @@ def preprocess_data(model, raw):
 
 if __name__ == '__main__':
     args = parser.parse_args()
-    # train(args)
+    #train(args)
     test(args)
