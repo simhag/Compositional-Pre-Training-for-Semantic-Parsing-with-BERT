@@ -43,10 +43,10 @@ class TSP(nn.Module):
         self.target_vocab = target_vocab  # peutetre faire nous-meme le vocab pour le decoder, puis look-up embedding dessus, petit helper dans le code de hugging face
         self.model_embeddings_source = nn.Sequential(DecoderEmbeddings(vocab=self.input_vocab, embed_size=d_model),
                                                      PositionalEncoding(d_model=d_model, dropout=dropout_rate,
-                                                                        max_len=200)) # MODIFIED, as per NESTING (100 to 200)
+                                                                        max_len=200))
         self.model_embeddings_target = nn.Sequential(DecoderEmbeddings(vocab=self.target_vocab, embed_size=d_model),
                                                      PositionalEncoding(d_model=d_model, dropout=dropout_rate,
-                                                                        max_len=200))  # simple look-up embedding for tokens # MODIFIED, as per NESTING
+                                                                        max_len=200))  # simple look-up embedding for tokens
         # no need for encoder, BERT includes the token embeddings in its architecture
         self.encoder = TransformerEncoder(
             layer=EncoderLayer(d_model=d_model, d_int=d_int, d_k=d_model // 8, d_v=d_model // 8, h=8,

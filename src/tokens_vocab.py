@@ -12,6 +12,8 @@ class Vocab(object):
         self.tokenizer.vocab['[START]'] = 1
         self.tokenizer.vocab['[END]'] = 2
         self.tokenizer.ids_to_tokens[2] = '[END]'
+        self.tokenizer.vocab['[SEP]'] = 3
+        self.tokenizer.ids_to_tokens[3] = '[SEP]'
 
     def to_input_tensor(self, input_strings_sequences, device):
         """
@@ -38,6 +40,6 @@ class Vocab(object):
 if __name__ == '__main__':
     vocab = Vocab('bert-base-uncased')
     for id, token in vocab.tokenizer.ids_to_tokens.items():
-        if token == '[UNK]':
+        if token == '</s>':
             print(id)
     print(vocab.tokenizer.ids_to_tokens[100])
