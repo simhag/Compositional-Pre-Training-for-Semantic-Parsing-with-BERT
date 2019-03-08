@@ -14,32 +14,44 @@ import numpy as np
 from tqdm import tqdm
 
 parser = ArgumentParser()
+# FOLDERS
 parser.add_argument("--data_folder", type=str, default="geoQueryData")
 parser.add_argument("--out_folder", type=str, default="outputs")
-parser.add_argument("--BERT", default="bert-base-uncased", type=str, help="bert-base-uncased, bert-large-uncased")
-parser.add_argument("--batch_size", default=16, type=int)
-parser.add_argument("--clip_grad", default=5.0, type=float)
+parser.add_argument("--log_dir", default='logs', type=str)
+parser.add_argument("--models_path", default='models', type=str)
+# MODEL
+parser.add_argument("--TSP_BSP", default=0, type=int, help="0: TSP model, 1:BSP")
+parser.add_argument("--BERT", default="bert-base-uncased", type=str, help="bert-base-uncased or bert-large-uncased")
+# MODEL PARAMETERS
 parser.add_argument("--d_model", default=128, type=int)
 parser.add_argument("--d_int", default=512, type=int)
 parser.add_argument("--dropout", default=0.1, type=float)
+parser.add_argument("--n_layers", default=2, type=int)
+# DOMAIN
+parser.add_argument("--domain", default='geoquery', type=str)
+# DATA RECOMBINATION
+parser.add_argument("--recombination", default='nesting', type=str)
+# number of extra data points
+# TRAINING PARAMETERS
+parser.add_argument("--train", default=True, type=bool)
+parser.add_argument("--batch_size", default=16, type=int)
+parser.add_argument("--clip_grad", default=5.0, type=float)
 parser.add_argument("--lr", default=0.001, type=float)
-parser.add_argument("--models_path", default='models', type=str)
-parser.add_argument("--epoch_to_load", default=195, type=int) #160 for entity, 185 for nesting
-parser.add_argument("--seed", default=1515, type=int)
-parser.add_argument("--shuffle", default=True, type=bool)
-parser.add_argument("--log_dir", default='logs', type=str)
-parser.add_argument("--log", default=True, type=bool)
 parser.add_argument("--epochs", default=200, type=int)
 parser.add_argument("--save_every", default=5, type=int)
-parser.add_argument("--n_layers", default=2, type=int)
-parser.add_argument("--decoding", default='beam_search', type=str) # greedy by default
+parser.add_argument("--log", default=True, type=bool)
+parser.add_argument("--shuffle", default=True, type=bool)
+# TESTING PARAMETERS
+parser.add_argument("--test", default=True, type=bool)
+parser.add_argument("--epoch_to_load", default=195, type=int)
+parser.add_argument("--decoding", default='beam_search', type=str)
 parser.add_argument("--beam_size", default=5, type=int)
 parser.add_argument("--max_decode_len", default=250, type=int)
-parser.add_argument("--domain", default='geoquery', type=str)
-parser.add_argument("--recombination", default='nesting', type=str)
+# RANDOM SEED
+parser.add_argument("--seed", default=1515, type=int)
 
 
-#TODO more proper management of different datasets and BSP / TSP split
+# TODO more proper management of different datasets and BSP / TSP split
 def main(arg_parser):
     # seed the random number generators
     seed = arg_parser.seed
@@ -327,5 +339,5 @@ def preprocess_data(model, raw):
 
 if __name__ == '__main__':
     args = parser.parse_args()
-    #train(args)
+    # train(args)
     test(args)
