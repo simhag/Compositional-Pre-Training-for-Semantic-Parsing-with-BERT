@@ -34,7 +34,7 @@ parser.add_argument("--save_every", default=5, type=int)
 parser.add_argument("--n_layers", default=2, type=int)
 parser.add_argument("--decoding", default='beam_search', type=str)
 parser.add_argument("--beam_size", default=5, type=int)
-parser.add_argument("--max_decode_len", default=105, type=int)
+parser.add_argument("--max_decode_len", default=200, type=int)
 parser.add_argument("--domain", default='geoquery', type=str)
 parser.add_argument("--recombination", default='', type=str)
 
@@ -151,12 +151,12 @@ def train(arg_parser):
 def test(arg_parser):
     recombination = arg_parser.recombination
     if len(recombination) > 0:
-        test_dataset = get_dataset_finish_by(arg_parser.data_folder, 'test', f"{recombination}_recomb.tsv")
         file_name_epoch_indep = f"TSP_recomb_{recombination}"
+        finish_by_string = f"280_{recombination}_recomb.tsv"
     else:
-        test_dataset = get_dataset_finish_by(arg_parser.data_folder, 'test', '280.tsv')
         file_name_epoch_indep = "TSP"
-
+        finish_by_string = '280.tsv'
+    test_dataset = get_dataset_finish_by(arg_parser.data_folder, 'test', finish_by_string)
     vocab = Vocab(arg_parser.BERT)
     file_path = os.path.join(arg_parser.models_path, f"{file_name_epoch_indep}_epoch_{arg_parser.epoch_to_load}.pt")
     model = TSP(input_vocab=vocab, target_vocab=vocab, d_model=arg_parser.d_model, d_int=arg_parser.d_model,
@@ -173,10 +173,10 @@ def test(arg_parser):
         test_accuracy = eval_method(parsing_outputs, gold_queries)
         print(f"evaluation method is {eval_name}")
         print(
-            f"test accuracy, model {eval_name}_{arg_parser.decoding}_TSP_{arg_parser.epoch_to_load}: {test_accuracy:2f}")
+            f"test accuracy, model {eval_name}_{arg_parser.decoding}_{file_name_epoch_indep}_{arg_parser.epoch_to_load}: {test_accuracy:2f}")
 
     outfile = os.path.join(arg_parser.data_folder, os.path.join(arg_parser.out_folder,
-                                                                f"{eval_name}_{arg_parser.decoding}_TSP_{arg_parser.epoch_to_load}.txt"))
+                                                                f"{eval_name}_{arg_parser.decoding}_{file_name_epoch_indep}_{arg_parser.epoch_to_load}.txt"))
     with open(outfile, 'w') as f:
         for parsing_output in parsing_outputs:
             f.write(''.join(parsing_output) + '\n')
@@ -190,8 +190,9 @@ def decoding(loaded_model, test_dataset, arg_parser):
     loaded_model.eval()
     model_outputs = []
     gold_queries = []
+    total = 280
     with torch.no_grad():
-        for src_sent_batch, gold_target in tqdm(data_iterator(test_dataset, batch_size=1, shuffle=False), total=280):
+        for src_sent_batch, gold_target in tqdm(data_iterator(test_dataset, batch_size=1, shuffle=False), total=total):
             example_hyps = decoding_method(src_sent=src_sent_batch, max_len=max_len, beam_size=beam_size)
             model_outputs.append(example_hyps[0])
             gold_queries.append(loaded_model.target_vocab.to_input_tokens(gold_target)[0])

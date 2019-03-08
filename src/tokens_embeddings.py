@@ -6,7 +6,7 @@ import math
 
 class PositionalEncoding(nn.Module):
     #TODO check the numerical values given our small input lengths...
-    def __init__(self, d_model, dropout, max_len=100):
+    def __init__(self, d_model, dropout, max_len=200):
         super(PositionalEncoding, self).__init__()
         self.dropout = nn.Dropout(p=dropout)
 
@@ -36,7 +36,7 @@ class DecoderEmbeddings(nn.Module):
     Class that converts input words to their CNN-based embeddings.
     """
 
-    def __init__(self, vocab, embed_size=512, dropout_rate=0.1, max_len=100):
+    def __init__(self, vocab, embed_size=512, dropout_rate=0.1, max_len=200):
         """
         Init the Embedding layer for one language
         @param embed_size (int): Embedding size (dimensionality) for the output
