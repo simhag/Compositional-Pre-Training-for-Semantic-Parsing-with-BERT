@@ -147,13 +147,8 @@ class Augmenter():
         return aug_data
 
 
-def main():
+def main(folder, domain, augmentation_type, num):
     """Print augmented data to stdout."""
-    if len(sys.argv) < 5:
-        print('Usage: %s [folder] [domain] [aug-type] [num]' % sys.argv[0], file=sys.stderr)
-        sys.exit(1)
-    folder, domain_name, aug_type_str, num = sys.argv[1:5]
-    num = int(num)
     aug_types = aug_type_str.split('+')
     data = []
     domain = domains.new(domain_name)
@@ -182,4 +177,9 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    if len(sys.argv) < 5:
+        print('Usage: %s [folder] [domain] [aug-type] [num]' % sys.argv[0], file=sys.stderr)
+        sys.exit(1)
+    folder, domain_name, aug_type_str, num = sys.argv[1:5]
+    num = int(num)
+    main(folder = folder, domain = domain_name, augmentation_type = aug_type_str, num = num)

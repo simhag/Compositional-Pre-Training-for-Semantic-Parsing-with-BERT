@@ -228,50 +228,50 @@ def jaccard_strict(model_queries, gold_queries):
     return score / n
 
 
-#
-# def knowledge_based_evaluation(model_queries, gold_queries, domain = domains.GeoqueryDomain()):
-#     '''
-#     Evaluate the model through knowledge-base metrics
-#     '''
-#     is_correct_list = []
-#     tokens_correct_list = []
-#     x_len_list = []
-#     y_len_list = []
-#
-#     #print("This is the predicted queries \n", model_queries[0][0])
-#     #print("This is the expected queries \n", gold_queries)
-#
-#     if domain:
-#     #    all_derivs = [decoding_method(sources=ex, max_len=max_len, beam_size=beam_size) for ex in dataset]
-#     #    true_answers = [ex for ex in dataset]
-#         derivs, denotation_correct_list = domain.compare_answers(model_queries, gold_queries)
-#     #else:
-#     #    derivs = [decoding_method(model, ex)[0] for ex in dataset]
-#     #    denotation_correct_list = None
-#
-#     for i, ex in enumerate(dataset):
-#         print('Example %d' % i)
-#         print('  x      = "%s"' % ex.x_str)
-#         print('  y      = "%s"' % ex.y_str)
-#         prob = derivs[i].p
-#         y_pred_toks = derivs[i].y_toks
-#         y_pred_str = ' '.join(y_pred_toks)
-#
-#     # Compute accuracy metrics
-#         is_correct = (y_pred_str == ex.y_str)
-#         tokens_correct = sum(a == b for a, b in zip(y_pred_toks, ex.y_toks))
-#         is_correct_list.append(is_correct)
-#         tokens_correct_list.append(tokens_correct)
-#         x_len_list.append(len(ex.x_toks))
-#         y_len_list.append(len(ex.y_toks))
-#         print('  y_pred = "%s"' % y_pred_str)
-#         print('  sequence correct = %s' % is_correct)
-#         print('  token accuracy = %d/%d = %g' % (tokens_correct, len(ex.y_toks), float(tokens_correct) / len(ex.y_toks)))
-#         if denotation_correct_list:
-#             denotation_correct = denotation_correct_list[i]
-#             print('  denotation correct = %s' % denotation_correct)
-#     #print_accuracy_metrics(name, is_correct_list, tokens_correct_list,
-#     #                     x_len_list, y_len_list, denotation_correct_list)
+
+ def knowledge_based_evaluation(model_queries, gold_queries, domain = domains.GeoqueryDomain()):
+     '''
+     Evaluate the model through knowledge-base metrics
+     '''
+     is_correct_list = []
+     tokens_correct_list = []
+     x_len_list = []
+     y_len_list = []
+
+     #print("This is the predicted queries \n", model_queries[0][0])
+     #print("This is the expected queries \n", gold_queries)
+
+     if domain:
+     #    all_derivs = [decoding_method(sources=ex, max_len=max_len, beam_size=beam_size) for ex in dataset]
+     #    true_answers = [ex for ex in dataset]
+         derivs, denotation_correct_list = domain.compare_answers(model_queries, gold_queries)
+     #else:
+     #    derivs = [decoding_method(model, ex)[0] for ex in dataset]
+     #    denotation_correct_list = None
+
+     for i, ex in enumerate(dataset):
+         print('Example %d' % i)
+         print('  x      = "%s"' % ex.x_str)
+         print('  y      = "%s"' % ex.y_str)
+         prob = derivs[i].p
+         y_pred_toks = derivs[i].y_toks
+         y_pred_str = ' '.join(y_pred_toks)
+
+     # Compute accuracy metrics
+         is_correct = (y_pred_str == ex.y_str)
+         tokens_correct = sum(a == b for a, b in zip(y_pred_toks, ex.y_toks))
+         is_correct_list.append(is_correct)
+         tokens_correct_list.append(tokens_correct)
+         x_len_list.append(len(ex.x_toks))
+         y_len_list.append(len(ex.y_toks))
+         print('  y_pred = "%s"' % y_pred_str)
+         print('  sequence correct = %s' % is_correct)
+         print('  token accuracy = %d/%d = %g' % (tokens_correct, len(ex.y_toks), float(tokens_correct) / len(ex.y_toks)))
+         if denotation_correct_list:
+             denotation_correct = denotation_correct_list[i]
+             print('  denotation correct = %s' % denotation_correct)
+     #print_accuracy_metrics(name, is_correct_list, tokens_correct_list,
+     #                     x_len_list, y_len_list, denotation_correct_list)
 
 def strict_evaluation(model_queries, gold_queries):
     n = len(model_queries)
