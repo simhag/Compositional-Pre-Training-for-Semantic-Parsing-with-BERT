@@ -254,6 +254,7 @@ def jaccard_strict(model_queries, gold_queries):
     return score / n
 
 
+
 # def knowledge_based_evaluation(model_queries, gold_queries, domain = domains.GeoqueryDomain()):
 #     '''
 #     Evaluate the model through knowledge-base metrics
