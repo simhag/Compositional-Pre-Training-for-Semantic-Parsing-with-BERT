@@ -12,6 +12,9 @@ import time
 import math
 import numpy as np
 from tqdm import tqdm
+import data_recombination
+
+DOMAIN = 'geoquery'
 
 parser = ArgumentParser()
 # FOLDERS
@@ -20,18 +23,20 @@ parser.add_argument("--out_folder", type=str, default="outputs")
 parser.add_argument("--log_dir", default='logs', type=str)
 parser.add_argument("--models_path", default='models', type=str)
 # MODEL
-parser.add_argument("--TSP_BSP", default=0, type=int, help="0: TSP model, 1:BSP")
+parser.add_argument("--TSP_BSP", default=1, type=int, help="0: TSP model, 1:BSP")
 parser.add_argument("--BERT", default="bert-base-uncased", type=str, help="bert-base-uncased or bert-large-uncased")
 # MODEL PARAMETERS
 parser.add_argument("--d_model", default=128, type=int)
 parser.add_argument("--d_int", default=512, type=int)
+parser.add_argument("--h", default=8, type=int)
+parser.add_argument("--d_k", default=16, type=int)
 parser.add_argument("--dropout", default=0.1, type=float)
 parser.add_argument("--n_layers", default=2, type=int)
-# DOMAIN
-parser.add_argument("--domain", default='geoquery', type=str)
+parser.add_argument("--max_len_pe", default=200, type=int)
 # DATA RECOMBINATION
-parser.add_argument("--recombination", default='nesting', type=str)
-# number of extra data points
+parser.add_argument("--recombination_method", default='entity', type=str)
+parser.add_argument("--extras_train", default=600, type=int)
+parser.add_argument("--extras_dev", default=100, type=int)
 # TRAINING PARAMETERS
 parser.add_argument("--train", default=True, type=bool)
 parser.add_argument("--batch_size", default=16, type=int)
@@ -51,13 +56,26 @@ parser.add_argument("--max_decode_len", default=250, type=int)
 parser.add_argument("--seed", default=1515, type=int)
 
 
-# TODO more proper management of different datasets and BSP / TSP split
+def do_data_recombination(argparser):
+    folders = ['train', 'dev', 'test']
+    nums_folder = {'train': argparser.extras_train, 'dev': argparser.extras_dev, 'test': 0}
+    global DOMAIN
+    for folder in folders:
+        data_recombination.main(folder=folder, domain=DOMAIN, augmentation_type=argparser.recombination_method,
+                                num=nums_folder[folder])
+    return
+
+
 def main(arg_parser):
-    # seed the random number generators
+    assert arg_parser.h * arg_parser.d_k == arg_parser.d_model, "d_k * h must be equal to d_model"
+    # create_directories(arg_parser)
+    # if not os.path.isdir(arg_parser.log_dir):
+    #     os.makedirs(arg_parser.log_dir)
     seed = arg_parser.seed
     torch.manual_seed(seed)
     torch.cuda.manual_seed(seed)
     np.random.seed(seed * 13 // 7)
+    do_data_recombination(arg_parser)
     if arg_parser.train:
         train(arg_parser)
     if arg_parser.test:
@@ -65,29 +83,31 @@ def main(arg_parser):
     return
 
 
-def train(arg_parser):
-    recombination = arg_parser.recombination
-    if len(recombination) > 0:
-        train_dataset = get_dataset_finish_by(arg_parser.data_folder, 'train', f"{recombination}_recomb.tsv")
-        test_dataset = get_dataset_finish_by(arg_parser.data_folder, 'dev', f"{recombination}_recomb.tsv")
-        file_name_epoch_indep = f"TSP_recomb_{recombination}"
+def get_model_name(argparser):
+    if argparser.TSP_BSP:
+        base_model = 'TSP'
     else:
-        train_dataset = get_dataset_finish_by(arg_parser.data_folder, 'train', '600.tsv')
-        test_dataset = get_dataset_finish_by(arg_parser.data_folder, 'dev', '100.tsv')
-        file_name_epoch_indep = "TSP"
-    vocab = Vocab(arg_parser.BERT)
-    model = TSP(input_vocab=vocab, target_vocab=vocab, d_model=arg_parser.d_model, d_int=arg_parser.d_model,
-                n_layers=arg_parser.n_layers, dropout_rate=arg_parser.dropout)
+        base_model = 'BSP'
+    return f"{base_model}_d_model{argparser.d_model}_layers{argparser.n_layers}_recomb{argparser.recombination_method}_extrastrain{argparser.extras_train}_extrasdev{argparser.extras_dev}"
 
+
+def train(arg_parser):
+    file_name_epoch_indep = get_model_name(arg_parser)
+    recombination = arg_parser.recombination_method
+    train_dataset = get_dataset_finish_by(arg_parser.data_folder, 'train',
+                                          f"{600 + arg_parser.extras_train}_{recombination}_recomb.tsv")
+    test_dataset = get_dataset_finish_by(arg_parser.data_folder, 'dev',
+                                         f"{100 + arg_parser.extras_dev}_{recombination}_recomb.tsv")
+    vocab = Vocab(arg_parser.BERT)
+    model_type = TSP if arg_parser.TSP_BSP else BSP
+    model = model_type(input_vocab=vocab, target_vocab=vocab, d_model=arg_parser.d_model, d_int=arg_parser.d_int,
+                       d_k=arg_parser.d_k, h=arg_parser.h, n_layers=arg_parser.n_layers,
+                       dropout_rate=arg_parser.dropout, max_len_pe=arg_parser.max_len_pe)
     model.train()
 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     model = model.to(device)
-
     optimizer = torch.optim.Adam(model.parameters(), lr=arg_parser.lr)
-
-    if not os.path.isdir(arg_parser.log_dir):
-        os.makedirs(arg_parser.log_dir)
 
     summary_writer = SummaryWriter(log_dir=arg_parser.log_dir) if arg_parser.log else None
 
@@ -117,9 +137,6 @@ def train(arg_parser):
 
             # clip gradient
             grad_norm = torch.nn.utils.clip_grad_norm_(model.parameters(), arg_parser.clip_grad)
-
-            # if batch_idx % 100 == 0:
-            #     print("{:.2f}".format(loss))
 
             optimizer.zero_grad()
             loss.backward()
@@ -161,18 +178,16 @@ def train(arg_parser):
 
 
 def test(arg_parser):
-    recombination = arg_parser.recombination
-    if len(recombination) > 0:
-        file_name_epoch_indep = f"TSP_recomb_{recombination}"
-        finish_by_string = f"280_{recombination}_recomb.tsv"
-    else:
-        file_name_epoch_indep = "TSP"
-        finish_by_string = '280.tsv'
-    test_dataset = get_dataset_finish_by(arg_parser.data_folder, 'test', finish_by_string)
+    file_name_epoch_indep = get_model_name(arg_parser)
+    recombination = arg_parser.recombination_method
+    test_dataset = get_dataset_finish_by(arg_parser.data_folder, 'dev',
+                                         f"{100 + arg_parser.extras_dev}_{recombination}_recomb.tsv")
     vocab = Vocab(arg_parser.BERT)
     file_path = os.path.join(arg_parser.models_path, f"{file_name_epoch_indep}_epoch_{arg_parser.epoch_to_load}.pt")
-    model = TSP(input_vocab=vocab, target_vocab=vocab, d_model=arg_parser.d_model, d_int=arg_parser.d_model,
-                n_layers=arg_parser.n_layers, dropout_rate=arg_parser.dropout)
+    model_type = TSP if arg_parser.TSP_BSP else BSP
+    model = model_type(input_vocab=vocab, target_vocab=vocab, d_model=arg_parser.d_model, d_int=arg_parser.d_int,
+                       d_k=arg_parser.d_k, h=arg_parser.h, n_layers=arg_parser.n_layers,
+                       dropout_rate=arg_parser.dropout, max_len_pe=arg_parser.max_len_pe)
     load_model(file_path=file_path, model=model)
     evaluation_methods = {'strict': strict_evaluation, 'jaccard': jaccard, 'jaccard_strict': jaccard_strict}
 
@@ -202,9 +217,8 @@ def decoding(loaded_model, test_dataset, arg_parser):
     loaded_model.eval()
     model_outputs = []
     gold_queries = []
-    total = 280
     with torch.no_grad():
-        for src_sent_batch, gold_target in tqdm(data_iterator(test_dataset, batch_size=1, shuffle=False), total=total):
+        for src_sent_batch, gold_target in tqdm(data_iterator(test_dataset, batch_size=1, shuffle=False), total=280):
             example_hyps = decoding_method(src_sent=src_sent_batch, max_len=max_len, beam_size=beam_size)
             model_outputs.append(example_hyps[0])
             gold_queries.append(loaded_model.target_vocab.to_input_tokens(gold_target)[0])
@@ -240,7 +254,6 @@ def jaccard_strict(model_queries, gold_queries):
     return score / n
 
 
-#
 # def knowledge_based_evaluation(model_queries, gold_queries, domain = domains.GeoqueryDomain()):
 #     '''
 #     Evaluate the model through knowledge-base metrics
@@ -339,5 +352,4 @@ def preprocess_data(model, raw):
 
 if __name__ == '__main__':
     args = parser.parse_args()
-    # train(args)
-    test(args)
+    main(args)
