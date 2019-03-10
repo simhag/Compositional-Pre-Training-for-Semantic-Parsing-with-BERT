@@ -24,7 +24,7 @@ from utils import get_dataset_finish_by
 import domains
 from grammar import Grammar
 
-END_OF_SENTENCE = '[SEP]'#'</s>'
+END_OF_SENTENCE = '[SEP]'  # '</s>'
 
 
 class Augmenter():
@@ -132,7 +132,7 @@ class Augmenter():
             else:
                 new_grammar.add_rule(cat, x_str, y_str)
         # print("This is the grammar :", new_grammar.rule_list)
-        root_str = (' %s ' % '[SEP]').join('$sentence_%d' % i for i in range(concat_num)) #TODO here if issue
+        root_str = (' %s ' % '[SEP]').join('$sentence_%d' % i for i in range(concat_num))  # TODO here if issue
         # print("This is the root_str :", root_str)
         new_grammar.add_rule(new_grammar.ROOT, root_str, root_str)
         # new_grammar.print_self()
@@ -149,9 +149,9 @@ class Augmenter():
 
 def main(folder, domain, augmentation_type, num):
     """Print augmented data to stdout."""
-    aug_types = aug_type_str.split('+')
+    aug_types = augmentation_type.split('+')
     data = []
-    domain = domains.new(domain_name)
+    domain = domains.new(domain)
     if folder == 'train':
         fname = './geoQueryData/train/geo880_train600.tsv'
         nums_data = 600
@@ -168,7 +168,7 @@ def main(folder, domain, augmentation_type, num):
             data.append((x, y))
     augmenter = Augmenter(domain, data, aug_types)
     aug_data = augmenter.sample(num)
-    path = f"./geoQueryData/{folder}/geo880_{folder}_{num + nums_data}_{aug_type_str}_recomb.tsv"
+    path = f"./geoQueryData/{folder}/geo880_{folder}_{num + nums_data}_{augmentation_type}_recomb.tsv"
     with open(path, 'w') as f:
         for data in data:
             f.write(data[0] + '\t' + data[1] + '\n')
@@ -182,4 +182,4 @@ if __name__ == '__main__':
         sys.exit(1)
     folder, domain_name, aug_type_str, num = sys.argv[1:5]
     num = int(num)
-    main(folder = folder, domain = domain_name, augmentation_type = aug_type_str, num = num)
+    main(folder=folder, domain=domain_name, augmentation_type=aug_type_str, num=num)

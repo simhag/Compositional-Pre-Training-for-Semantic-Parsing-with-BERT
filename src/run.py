@@ -38,7 +38,7 @@ parser.add_argument("--recombination_method", default='entity', type=str)
 parser.add_argument("--extras_train", default=600, type=int)
 parser.add_argument("--extras_dev", default=100, type=int)
 # TRAINING PARAMETERS
-parser.add_argument("--train", default=True, type=bool)
+parser.add_argument("--train_arg", default=1, type=int)
 parser.add_argument("--batch_size", default=16, type=int)
 parser.add_argument("--clip_grad", default=5.0, type=float)
 parser.add_argument("--lr", default=0.001, type=float)
@@ -47,7 +47,7 @@ parser.add_argument("--save_every", default=5, type=int)
 parser.add_argument("--log", default=True, type=bool)
 parser.add_argument("--shuffle", default=True, type=bool)
 # TESTING PARAMETERS
-parser.add_argument("--test", default=True, type=bool)
+parser.add_argument("--test_arg", default=1, type=int)
 parser.add_argument("--epoch_to_load", default=195, type=int)
 parser.add_argument("--decoding", default='beam_search', type=str)
 parser.add_argument("--beam_size", default=5, type=int)
@@ -76,9 +76,9 @@ def main(arg_parser):
     torch.cuda.manual_seed(seed)
     np.random.seed(seed * 13 // 7)
     do_data_recombination(arg_parser)
-    if arg_parser.train:
+    if arg_parser.train_arg:
         train(arg_parser)
-    if arg_parser.test:
+    if arg_parser.test_arg:
         test(arg_parser)
     return
 
@@ -180,8 +180,8 @@ def train(arg_parser):
 def test(arg_parser):
     file_name_epoch_indep = get_model_name(arg_parser)
     recombination = arg_parser.recombination_method
-    test_dataset = get_dataset_finish_by(arg_parser.data_folder, 'dev',
-                                         f"{100 + arg_parser.extras_dev}_{recombination}_recomb.tsv")
+    test_dataset = get_dataset_finish_by(arg_parser.data_folder, 'test',
+                                         f"{recombination}_recomb.tsv")
     vocab = Vocab(arg_parser.BERT)
     file_path = os.path.join(arg_parser.models_path, f"{file_name_epoch_indep}_epoch_{arg_parser.epoch_to_load}.pt")
     model_type = TSP if arg_parser.TSP_BSP else BSP
