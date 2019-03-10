@@ -53,5 +53,6 @@ class DecoderEmbeddings(nn.Module):
         input: size bsize, max_n_tokens
         :rtype: size bsize, max_n_tokens, embed_size
         """
+
         output = self.embeddings(input)
         return output

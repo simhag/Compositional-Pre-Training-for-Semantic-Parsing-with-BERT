@@ -107,7 +107,7 @@ def train(arg_parser):
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     model = model.to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=arg_parser.lr)
-
+    model.device = device
     summary_writer = SummaryWriter(log_dir=arg_parser.log_dir) if arg_parser.log else None
 
     n_train = len(train_dataset)
