@@ -241,24 +241,32 @@ class GeoqueryDomain(Domain):
     return 'FAILED' in d or 'Join failed syntactically' in d
 
   def compare_answers(self, true_answers, all_derivs):
+    #print(true_answers)
+    #print(all_derivs)
     all_lfs = ([self.format_lf(s) for s in true_answers] +
-               #[self.format_lf(' '.join(d.y_toks)) 
-               [self.format_lf(' '.join(d)) 
-                for x in all_derivs for d in x])
+    #           #[self.format_lf(' '.join(d.y_toks)) 
+               [self.format_lf(x) for x in all_derivs])# for x in all_derivs for d in x])
+    #print(all_lfs)
     tf_lines = ['_parse([query], %s).' % lf for lf in all_lfs]
     tf = tempfile.NamedTemporaryFile(suffix='.dlog')
     for line in tf_lines:
       print(line)
     tf.flush()
     msg = subprocess.check_output(['evaluator/geoquery', tf.name])
+    #print("This is msg: \n", msg)
     tf.close()
     denotations = [self.get_denotation(line)
-                   for line in msg.split('\n')
-                   if line.startswith('        Example')]
+                   for line in msg.split(b'\n') #for line in msg.split('\n')
+                   if line.startswith(b'        Example')] #if line.startswith('        Example')]
+    #import pdb
+    #pdb.set_trace()
     true_dens = denotations[:len(true_answers)]
     all_pred_dens = denotations[len(true_answers):]
 
     # Find the top-scoring derivation that executed without error
+    print("This is true_dens: \n", true_dens)
+    print("This is all_pred_dens: \n", all_pred_dens)
+    print("This is all_derivs: \n", all_derivs)
     derivs, pred_dens = pick_derivations(true_dens, all_pred_dens, all_derivs,
                                          self.is_error)
     self.print_failures(true_dens, 'gold')
