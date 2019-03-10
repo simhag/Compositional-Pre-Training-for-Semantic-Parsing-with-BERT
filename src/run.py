@@ -1,12 +1,11 @@
 import torch
 from argparse import ArgumentParser
 import os
-from utils import read_GeoQuery, data_iterator
+from utils import data_iterator, get_dataset_finish_by, save_model, load_model, detokenize
 from pytorch_pretrained_bert.modeling import BertModel
 from tokens_vocab import Vocab
 import domains
 from semantic_parser import TSP, BSP
-from utils import get_dataset_finish_by, save_model, get_dataset, load_model
 from tensorboardX import SummaryWriter
 import time
 import math
@@ -48,7 +47,7 @@ parser.add_argument("--log", default=True, type=bool)
 parser.add_argument("--shuffle", default=True, type=bool)
 # TESTING PARAMETERS
 parser.add_argument("--test_arg", default=1, type=int)
-parser.add_argument("--epoch_to_load", default=195, type=int)
+parser.add_argument("--epoch_to_load", default=5, type=int)
 parser.add_argument("--decoding", default='beam_search', type=str)
 parser.add_argument("--beam_size", default=5, type=int)
 parser.add_argument("--max_decode_len", default=250, type=int)
@@ -220,14 +219,14 @@ def decoding(loaded_model, test_dataset, arg_parser):
     with torch.no_grad():
         for src_sent_batch, gold_target in tqdm(data_iterator(test_dataset, batch_size=1, shuffle=False), total=280):
             example_hyps = decoding_method(src_sent=src_sent_batch, max_len=max_len, beam_size=beam_size)
-            model_outputs.append(example_hyps[0])
-            gold_queries.append(loaded_model.target_vocab.to_input_tokens(gold_target)[0])
+            model_outputs.append(detokenize(example_hyps[0]))
+            gold_queries.append(gold_target[0])
     return model_outputs, gold_queries
 
 
 def jaccard_similarity(tokens1, tokens2):
-    set1 = set(tokens1)
-    set2 = set(tokens2)
+    set1 = set([char for char in tokens1])
+    set2 = set([char for char in tokens2])
     score = len(set1 & set2) / len(set1 | set2)
     return score
 
