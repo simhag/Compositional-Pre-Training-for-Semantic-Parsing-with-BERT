@@ -4,3 +4,5 @@ src/__pycache__/
 src/.idea/
 src/logs/
 .idea/
+src/evaluator
+src/state
