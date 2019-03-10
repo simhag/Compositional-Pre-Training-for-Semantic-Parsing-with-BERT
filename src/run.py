@@ -20,6 +20,7 @@ parser = ArgumentParser()
 parser.add_argument("--data_folder", type=str, default="geoQueryData")
 parser.add_argument("--out_folder", type=str, default="outputs")
 parser.add_argument("--log_dir", default='logs', type=str)
+parser.add_argument("--subdir", default="run1", type=str)
 parser.add_argument("--models_path", default='models', type=str)
 # MODEL
 parser.add_argument("--TSP_BSP", default=1, type=int, help="0: TSP model, 1:BSP")
@@ -91,6 +92,9 @@ def get_model_name(argparser):
 
 
 def train(arg_parser):
+    logs_path = os.path.join(arg_parser.log_dir, arg_parser.subdir)
+    if not os.path.isdir(logs_path):
+        os.makedirs(logs_path)
     file_name_epoch_indep = get_model_name(arg_parser)
     recombination = arg_parser.recombination_method
     train_dataset = get_dataset_finish_by(arg_parser.data_folder, 'train',
@@ -108,7 +112,7 @@ def train(arg_parser):
     model = model.to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=arg_parser.lr)
     model.device = device
-    summary_writer = SummaryWriter(log_dir=arg_parser.log_dir) if arg_parser.log else None
+    summary_writer = SummaryWriter(log_dir=logs_path) if arg_parser.log else None
 
     n_train = len(train_dataset)
     n_test = len(test_dataset)
