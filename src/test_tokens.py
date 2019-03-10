@@ -1,11 +1,10 @@
 import torch
 import os
-from utils import read_GeoQuery, data_iterator
+from utils import data_iterator, get_dataset_finish_by, save_model, get_dataset, load_model, detokenize
 from pytorch_pretrained_bert.modeling import BertModel
 from tokens_vocab import Vocab
 import domains
 from semantic_parser import TSP, BSP
-from utils import get_dataset_finish_by, save_model, get_dataset, load_model
 from tensorboardX import SummaryWriter
 import time
 import math
