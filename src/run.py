@@ -23,8 +23,8 @@ parser.add_argument("--log_dir", default='logs', type=str)
 parser.add_argument("--subdir", default="run1", type=str)
 parser.add_argument("--models_path", default='models', type=str)
 # MODEL
-parser.add_argument("--TSP_BSP", default=1, type=int, help="0: TSP model, 1:BSP")
-parser.add_argument("--BERT", default="bert-base-uncased", type=str, help="bert-base-uncased or bert-large-uncased")
+parser.add_argument("--TSP_BSP", default=1, type=int, help="1: TSP model, 0:BSP")
+parser.add_argument("--BERT", default="base", type=str, help="bert-base-uncased or bert-large-uncased (large)")
 # MODEL PARAMETERS
 parser.add_argument("--d_model", default=128, type=int)
 parser.add_argument("--d_int", default=512, type=int)
@@ -102,11 +102,11 @@ def train(arg_parser):
                                           f"{600 + arg_parser.extras_train}_{recombination}_recomb.tsv")
     test_dataset = get_dataset_finish_by(arg_parser.data_folder, 'dev',
                                          f"{100 + arg_parser.extras_dev}_{recombination}_recomb.tsv")
-    vocab = Vocab(arg_parser.BERT)
+    vocab = Vocab(f'bert-{arg_parser.BERT}-uncased')
     model_type = TSP if arg_parser.TSP_BSP else BSP
     model = model_type(input_vocab=vocab, target_vocab=vocab, d_model=arg_parser.d_model, d_int=arg_parser.d_int,
                        d_k=arg_parser.d_k, h=arg_parser.h, n_layers=arg_parser.n_layers,
-                       dropout_rate=arg_parser.dropout, max_len_pe=arg_parser.max_len_pe)
+                       dropout_rate=arg_parser.dropout, max_len_pe=arg_parser.max_len_pe, bert_name=arg_parser.BERT)
 
     file_path = os.path.join(arg_parser.models_path, f"{file_name_epoch_indep}_epoch_{arg_parser.epoch_to_load}.pt")
     if arg_parser.train_load:
