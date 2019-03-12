@@ -259,22 +259,18 @@ def test(arg_parser):
                        d_k=arg_parser.d_k, h=arg_parser.h, n_layers=arg_parser.n_layers,
                        dropout_rate=arg_parser.dropout, max_len_pe=arg_parser.max_len_pe)
     load_model(file_path=file_path, model=model)
-    #evaluation_methods = {'strict': strict_evaluation, 'jaccard': jaccard, 'jaccard_strict': jaccard_strict, 'Knowledge-based': knowledge_based_evaluation}
+    evaluation_methods = {'strict': strict_evaluation, 'jaccard': jaccard, 'jaccard_strict': jaccard_strict, 'Knowledge-based': knowledge_based_evaluation}
 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     model = model.to(device)
     model.device = device
     parsing_outputs, gold_queries = decoding(model, test_dataset, arg_parser)
 
-#    for eval_name, eval_method in evaluation_methods.items():
-#        test_accuracy = eval_method(parsing_outputs, gold_queries)
-#        print(f"evaluation method is {eval_name}")
-#        print(
-#            f"test accuracy, model {eval_name}_{arg_parser.decoding}_{file_name_epoch_indep}_{arg_parser.epoch_to_load}: {test_accuracy:2f}")
-    test_accuracy = knowledge_based_evaluation(parsing_outputs, gold_queries)
-    print(f"evaluation method is KB")
-    print(f"test accuracy, model KB_{arg_parser.decoding}_{file_name_epoch_indep}_{arg_parser.epoch_to_load}: {test_accuracy:2f}")
-
+    for eval_name, eval_method in evaluation_methods.items():
+        test_accuracy = eval_method(parsing_outputs, gold_queries)
+        print(f"evaluation method is {eval_name}")
+        print(
+            f"test accuracy, model {eval_name}_{arg_parser.decoding}_{file_name_epoch_indep}_{arg_parser.epoch_to_load}: {test_accuracy:2f}")
 
     outfile = os.path.join(arg_parser.data_folder, os.path.join(arg_parser.out_folder,
                                                                 f"{eval_name}_{arg_parser.decoding}_{file_name_epoch_indep}_{arg_parser.epoch_to_load}.txt"))
