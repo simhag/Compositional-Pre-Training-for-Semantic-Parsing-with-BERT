@@ -20,6 +20,7 @@ parser = ArgumentParser()
 parser.add_argument("--data_folder", type=str, default="geoQueryData")
 parser.add_argument("--out_folder", type=str, default="outputs")
 parser.add_argument("--log_dir", default='logs', type=str)
+parser.add_argument("--subdir", default="run1", type=str)
 parser.add_argument("--models_path", default='models', type=str)
 # MODEL
 parser.add_argument("--TSP_BSP", default=1, type=int, help="0: TSP model, 1:BSP")
@@ -38,6 +39,7 @@ parser.add_argument("--extras_train", default=600, type=int)
 parser.add_argument("--extras_dev", default=100, type=int)
 # TRAINING PARAMETERS
 parser.add_argument("--train_arg", default=1, type=int)
+parser.add_argument("--train_load", default=0, type=int)
 parser.add_argument("--batch_size", default=16, type=int)
 parser.add_argument("--clip_grad", default=5.0, type=float)
 parser.add_argument("--lr", default=0.001, type=float)
@@ -91,24 +93,37 @@ def get_model_name(argparser):
 
 
 def train(arg_parser):
+    logs_path = os.path.join(arg_parser.log_dir, arg_parser.subdir)
+    if not os.path.isdir(logs_path):
+        os.makedirs(logs_path)
     file_name_epoch_indep = get_model_name(arg_parser)
     recombination = arg_parser.recombination_method
-    train_dataset = get_dataset_finish_by(arg_parser.data_folder, 'train',
-                                          f"{600 + arg_parser.extras_train}_{recombination}_recomb.tsv")
-    test_dataset = get_dataset_finish_by(arg_parser.data_folder, 'dev',
-                                         f"{100 + arg_parser.extras_dev}_{recombination}_recomb.tsv")
     vocab = Vocab(arg_parser.BERT)
     model_type = TSP if arg_parser.TSP_BSP else BSP
     model = model_type(input_vocab=vocab, target_vocab=vocab, d_model=arg_parser.d_model, d_int=arg_parser.d_int,
                        d_k=arg_parser.d_k, h=arg_parser.h, n_layers=arg_parser.n_layers,
                        dropout_rate=arg_parser.dropout, max_len_pe=arg_parser.max_len_pe)
+
+    file_path = os.path.join(arg_parser.models_path, f"{file_name_epoch_indep}_epoch_{arg_parser.epoch_to_load}.pt")
+    if arg_parser.train_load:
+        train_dataset = get_dataset_finish_by(arg_parser.data_folder, 'train',
+                                              f"{600}_{recombination}_recomb.tsv")
+        test_dataset = get_dataset_finish_by(arg_parser.data_folder, 'dev',
+                                             f"{100}_{recombination}_recomb.tsv")
+        load_model(file_path=file_path, model=model)
+        print('loaded model')
+    else:
+        train_dataset = get_dataset_finish_by(arg_parser.data_folder, 'train',
+                                              f"{600 + arg_parser.extras_train}_{recombination}_recomb.tsv")
+        test_dataset = get_dataset_finish_by(arg_parser.data_folder, 'dev',
+                                             f"{100 + arg_parser.extras_dev}_{recombination}_recomb.tsv")
     model.train()
 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     model = model.to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=arg_parser.lr)
-
-    summary_writer = SummaryWriter(log_dir=arg_parser.log_dir) if arg_parser.log else None
+    model.device = device
+    summary_writer = SummaryWriter(log_dir=logs_path) if arg_parser.log else None
 
     n_train = len(train_dataset)
     n_test = len(test_dataset)
@@ -152,8 +167,14 @@ def train(arg_parser):
                                       train_loss / math.ceil(n_train / arg_parser.batch_size),
                                       global_step=epoch)
         if (epoch % arg_parser.save_every == 0) and arg_parser.log and epoch > 0:
-            save_model(arg_parser.models_path, f"{file_name_epoch_indep}_epoch_{epoch}.pt", model,
-                       device)
+            if arg_parser.train_load:
+                save_model(arg_parser.models_path,
+                           f"{file_name_epoch_indep}_epoch_{epoch + arg_parser.epoch_to_load}.pt", model,
+                           device)
+            else:
+                save_model(arg_parser.models_path,
+                           f"{file_name_epoch_indep}_epoch_{epoch + arg_parser.epoch_to_load}.pt", model,
+                           device)
         ## TEST
         test_loss = 0.0
 
@@ -176,6 +197,56 @@ def train(arg_parser):
     return None
 
 
+def jaccard_similarity(tokens1, tokens2):
+    set1 = set([char for char in tokens1])
+    set2 = set([char for char in tokens2])
+    score = len(set1 & set2) / len(set1 | set2)
+    return score
+
+
+def jaccard(model_queries, gold_queries):
+    n = len(model_queries)
+    print(n)
+    assert n == len(gold_queries)
+    score = 0
+    for i in tqdm(range(n)):
+        score += jaccard_similarity(model_queries[i], gold_queries[i])
+    return score / n
+
+
+def jaccard_strict(model_queries, gold_queries):
+    n = len(model_queries)
+    print(n)
+    assert n == len(gold_queries)
+    score = 0
+    for i in tqdm(range(n)):
+        x = jaccard_similarity(model_queries[i], gold_queries[i])
+        if x == 1:
+            score += 1
+    return score / n
+
+
+def strict_evaluation(model_queries, gold_queries):
+    n = len(model_queries)
+    assert n == len(gold_queries)
+    return sum([model_queries[x] == gold_queries[x] for x in range(n)]) / n
+
+
+def decoding(loaded_model, test_dataset, arg_parser):
+    beam_size = arg_parser.beam_size
+    max_len = arg_parser.max_decode_len
+    decoding_method = loaded_model.beam_search if arg_parser.decoding == 'beam_search' else loaded_model.decode_greedy
+    loaded_model.eval()
+    model_outputs = []
+    gold_queries = []
+    with torch.no_grad():
+        for src_sent_batch, gold_target in tqdm(data_iterator(test_dataset, batch_size=1, shuffle=False), total=280):
+            example_hyps = decoding_method(src_sent=src_sent_batch, max_len=max_len, beam_size=beam_size)
+            model_outputs.append(detokenize(example_hyps[0]))
+            gold_queries.append(gold_target[0])
+    return model_outputs, gold_queries
+
+
 def test(arg_parser):
     file_name_epoch_indep = get_model_name(arg_parser)
     recombination = arg_parser.recombination_method
@@ -192,7 +263,7 @@ def test(arg_parser):
 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     model = model.to(device)
-
+    model.device = device
     parsing_outputs, gold_queries = decoding(model, test_dataset, arg_parser)
 
 #    for eval_name, eval_method in evaluation_methods.items():
@@ -211,28 +282,6 @@ def test(arg_parser):
         for parsing_output in parsing_outputs:
             f.write(''.join(parsing_output) + '\n')
     return None
-
-
-def decoding(loaded_model, test_dataset, arg_parser):
-    beam_size = arg_parser.beam_size
-    max_len = arg_parser.max_decode_len
-    decoding_method = loaded_model.beam_search if arg_parser.decoding == 'beam_search' else loaded_model.decode_greedy
-    loaded_model.eval()
-    model_outputs = []
-    gold_queries = []
-    with torch.no_grad():
-        for src_sent_batch, gold_target in tqdm(data_iterator(test_dataset, batch_size=1, shuffle=False), total=280):
-            example_hyps = decoding_method(src_sent=src_sent_batch, max_len=max_len, beam_size=beam_size)
-            model_outputs.append(detokenize(example_hyps[0]))
-            gold_queries.append(gold_target[0])
-    return model_outputs, gold_queries
-
-
-def jaccard_similarity(tokens1, tokens2):
-    set1 = set([char for char in tokens1])
-    set2 = set([char for char in tokens2])
-    score = len(set1 & set2) / len(set1 | set2)
-    return score
 
 
 def jaccard(model_queries, gold_queries):
@@ -272,13 +321,13 @@ def knowledge_based_evaluation(model_queries, gold_queries, domain = domains.Geo
 #        score += 1
 #     return score / n
 
-    
-if __name__ == '__main__':
-    args = parser.parse_args()
-    main(args)
 
 def strict_evaluation(model_queries, gold_queries):
     n = len(model_queries)
     assert n == len(gold_queries)
     return sum([model_queries[x] == gold_queries[x] for x in range(n)]) / n
 
+
+if __name__ == '__main__':
+    args = parser.parse_args()
+    main(args)

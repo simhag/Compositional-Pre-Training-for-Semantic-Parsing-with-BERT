@@ -6,3 +6,4 @@ src/logs/
 .idea/
 src/evaluator
 src/state
+src/models_to_keep/
