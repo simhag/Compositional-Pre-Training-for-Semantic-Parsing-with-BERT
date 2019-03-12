@@ -111,6 +111,7 @@ def train(arg_parser):
     file_path = os.path.join(arg_parser.models_path, f"{file_name_epoch_indep}_epoch_{arg_parser.epoch_to_load}.pt")
     if arg_parser.train_load:
         load_model(file_path=file_path, model=model)
+        print('loaded model')
     model.train()
 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
