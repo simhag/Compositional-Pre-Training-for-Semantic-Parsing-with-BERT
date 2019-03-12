@@ -180,6 +180,56 @@ def train(arg_parser):
     return None
 
 
+def jaccard_similarity(tokens1, tokens2):
+    set1 = set([char for char in tokens1])
+    set2 = set([char for char in tokens2])
+    score = len(set1 & set2) / len(set1 | set2)
+    return score
+
+
+def jaccard(model_queries, gold_queries):
+    n = len(model_queries)
+    print(n)
+    assert n == len(gold_queries)
+    score = 0
+    for i in tqdm(range(n)):
+        score += jaccard_similarity(model_queries[i], gold_queries[i])
+    return score / n
+
+
+def jaccard_strict(model_queries, gold_queries):
+    n = len(model_queries)
+    print(n)
+    assert n == len(gold_queries)
+    score = 0
+    for i in tqdm(range(n)):
+        x = jaccard_similarity(model_queries[i], gold_queries[i])
+        if x == 1:
+            score += 1
+    return score / n
+
+
+def strict_evaluation(model_queries, gold_queries):
+    n = len(model_queries)
+    assert n == len(gold_queries)
+    return sum([model_queries[x] == gold_queries[x] for x in range(n)]) / n
+
+
+def decoding(loaded_model, test_dataset, arg_parser):
+    beam_size = arg_parser.beam_size
+    max_len = arg_parser.max_decode_len
+    decoding_method = loaded_model.beam_search if arg_parser.decoding == 'beam_search' else loaded_model.decode_greedy
+    loaded_model.eval()
+    model_outputs = []
+    gold_queries = []
+    with torch.no_grad():
+        for src_sent_batch, gold_target in tqdm(data_iterator(test_dataset, batch_size=1, shuffle=False), total=280):
+            example_hyps = decoding_method(src_sent=src_sent_batch, max_len=max_len, beam_size=beam_size)
+            model_outputs.append(detokenize(example_hyps[0]))
+            gold_queries.append(gold_target[0])
+    return model_outputs, gold_queries
+
+
 def test(arg_parser):
     file_name_epoch_indep = get_model_name(arg_parser)
     recombination = arg_parser.recombination_method
@@ -213,106 +263,59 @@ def test(arg_parser):
     return None
 
 
-def decoding(loaded_model, test_dataset, arg_parser):
-    beam_size = arg_parser.beam_size
-    max_len = arg_parser.max_decode_len
-    decoding_method = loaded_model.beam_search if arg_parser.decoding == 'beam_search' else loaded_model.decode_greedy
-    loaded_model.eval()
-    model_outputs = []
-    gold_queries = []
-    with torch.no_grad():
-        for src_sent_batch, gold_target in tqdm(data_iterator(test_dataset, batch_size=1, shuffle=False), total=280):
-            example_hyps = decoding_method(src_sent=src_sent_batch, max_len=max_len, beam_size=beam_size)
-            model_outputs.append(detokenize(example_hyps[0]))
-            gold_queries.append(gold_target[0])
-    return model_outputs, gold_queries
+def knowledge_based_evaluation(model_queries, gold_queries, domain=domains.GeoqueryDomain()):
+    '''
+    Evaluate the model through knowledge-base metrics
+    '''
+    is_correct_list = []
+    tokens_correct_list = []
+    x_len_list = []
+    y_len_list = []
 
+    # print("This is the predicted queries \n", model_queries[0][0])
+    # print("This is the expected queries \n", gold_queries)
 
-def jaccard_similarity(tokens1, tokens2):
-    set1 = set([char for char in tokens1])
-    set2 = set([char for char in tokens2])
-    score = len(set1 & set2) / len(set1 | set2)
-    return score
-
-
-def jaccard(model_queries, gold_queries):
-    n = len(model_queries)
-    print(n)
-    assert n == len(gold_queries)
-    score = 0
-    for i in tqdm(range(n)):
-        score += jaccard_similarity(model_queries[i], gold_queries[i])
-    return score / n
-
-
-def jaccard_strict(model_queries, gold_queries):
-    n = len(model_queries)
-    print(n)
-    assert n == len(gold_queries)
-    score = 0
-    for i in tqdm(range(n)):
-        x = jaccard_similarity(model_queries[i], gold_queries[i])
-        if x == 1:
-            score += 1
-    return score / n
-
-
-def knowledge_based_evaluation(model_queries, gold_queries, domain = domains.GeoqueryDomain()):
-     '''
-     Evaluate the model through knowledge-base metrics
-     '''
-     is_correct_list = []
-     tokens_correct_list = []
-     x_len_list = []
-     y_len_list = []
-
-    #print("This is the predicted queries \n", model_queries[0][0])
-    #print("This is the expected queries \n", gold_queries)
-
-     if domain:
-    #    all_derivs = [decoding_method(sources=ex, max_len=max_len, beam_size=beam_size) for ex in dataset]
-    #    true_answers = [ex for ex in dataset]
-         derivs, denotation_correct_list = domain.compare_answers(model_queries, gold_queries)
-    #else:
+    if domain:
+        #    all_derivs = [decoding_method(sources=ex, max_len=max_len, beam_size=beam_size) for ex in dataset]
+        #    true_answers = [ex for ex in dataset]
+        derivs, denotation_correct_list = domain.compare_answers(model_queries, gold_queries)
+    # else:
     #    derivs = [decoding_method(model, ex)[0] for ex in dataset]
     #    denotation_correct_list = None
 
-     for i, ex in enumerate(dataset):
-         print('Example %d' % i)
-         print('  x      = "%s"' % ex.x_str)
-         print('  y      = "%s"' % ex.y_str)
-         prob = derivs[i].p
-         y_pred_toks = derivs[i].y_toks
-         y_pred_str = ' '.join(y_pred_toks)
+    for i, ex in enumerate(dataset):
+        print('Example %d' % i)
+        print('  x      = "%s"' % ex.x_str)
+        print('  y      = "%s"' % ex.y_str)
+        prob = derivs[i].p
+        y_pred_toks = derivs[i].y_toks
+        y_pred_str = ' '.join(y_pred_toks)
 
-     # Compute accuracy metrics
-         is_correct = (y_pred_str == ex.y_str)
-         tokens_correct = sum(a == b for a, b in zip(y_pred_toks, ex.y_toks))
-         is_correct_list.append(is_correct)
-         tokens_correct_list.append(tokens_correct)
-         x_len_list.append(len(ex.x_toks))
-         y_len_list.append(len(ex.y_toks))
-         print('  y_pred = "%s"' % y_pred_str)
-         print('  sequence correct = %s' % is_correct)
-         print('  token accuracy = %d/%d = %g' % (tokens_correct, len(ex.y_toks), float(tokens_correct) / len(ex.y_toks)))
-         if denotation_correct_list:
-             denotation_correct = denotation_correct_list[i]
-             print('  denotation correct = %s' % denotation_correct)
-    #print_accuracy_metrics(name, is_correct_list, tokens_correct_list,
-    #                     x_len_list, y_len_list, denotation_correct_list)
+        # Compute accuracy metrics
+        is_correct = (y_pred_str == ex.y_str)
+        tokens_correct = sum(a == b for a, b in zip(y_pred_toks, ex.y_toks))
+        is_correct_list.append(is_correct)
+        tokens_correct_list.append(tokens_correct)
+        x_len_list.append(len(ex.x_toks))
+        y_len_list.append(len(ex.y_toks))
+        print('  y_pred = "%s"' % y_pred_str)
+        print('  sequence correct = %s' % is_correct)
+        print(
+            '  token accuracy = %d/%d = %g' % (tokens_correct, len(ex.y_toks), float(tokens_correct) / len(ex.y_toks)))
+        if denotation_correct_list:
+            denotation_correct = denotation_correct_list[i]
+            print('  denotation correct = %s' % denotation_correct)
+
+
+# print_accuracy_metrics(name, is_correct_list, tokens_correct_list,
+#                     x_len_list, y_len_list, denotation_correct_list)
 
 if __name__ == '__main__':
     args = parser.parse_args()
     main(args)
-    #model_queries = ["_answer ( NV , _smallest ( V0 , _state ( V0 ) ) )", "_answer ( A , ( _major ( A ) , _river ( A ) , _loc ( A , B ) , _const ( B , _stateid ( ohio ) ) ) )"]
-    #gold_queries = ["_answer ( NV , _smallest ( V0 , _state ( V0 ) ) )", "_answer ( A , ( _major ( A ) , _river ( A ) , _loc ( A , B ) , _const ( B , _stateid ( ohio ) ) ) )"]
-    #print(knowledge_based_evaluation(model_queries = model_queries, gold_queries = gold_queries))
-
-def strict_evaluation(model_queries, gold_queries):
-    n = len(model_queries)
-    assert n == len(gold_queries)
-    return sum([model_queries[x] == gold_queries[x] for x in range(n)]) / n
-
+    # model_queries = ["_answer ( NV , _smallest ( V0 , _state ( V0 ) ) )", "_answer ( A , ( _major ( A ) , _river ( A ) , _loc ( A , B ) , _const ( B , _stateid ( ohio ) ) ) )"]
+    # gold_queries = ["_answer ( NV , _smallest ( V0 , _state ( V0 ) ) )", "_answer ( A , ( _major ( A ) , _river ( A ) , _loc ( A , B ) , _const ( B , _stateid ( ohio ) ) ) )"]
+    # print(knowledge_based_evaluation(model_queries = model_queries, gold_queries = gold_queries))
 
 '''
 def load_dataset(filename, domain):
@@ -359,5 +362,3 @@ def preprocess_data(model, raw):
     data.append(ex)
   return data
 '''
-
-
