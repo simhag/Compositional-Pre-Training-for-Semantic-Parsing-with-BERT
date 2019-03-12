@@ -39,6 +39,7 @@ parser.add_argument("--extras_train", default=600, type=int)
 parser.add_argument("--extras_dev", default=100, type=int)
 # TRAINING PARAMETERS
 parser.add_argument("--train_arg", default=1, type=int)
+parser.add_argument("--train_load", default=0, type=int)
 parser.add_argument("--batch_size", default=16, type=int)
 parser.add_argument("--clip_grad", default=5.0, type=float)
 parser.add_argument("--lr", default=0.001, type=float)
@@ -106,6 +107,10 @@ def train(arg_parser):
     model = model_type(input_vocab=vocab, target_vocab=vocab, d_model=arg_parser.d_model, d_int=arg_parser.d_int,
                        d_k=arg_parser.d_k, h=arg_parser.h, n_layers=arg_parser.n_layers,
                        dropout_rate=arg_parser.dropout, max_len_pe=arg_parser.max_len_pe)
+
+    file_path = os.path.join(arg_parser.models_path, f"{file_name_epoch_indep}_epoch_{arg_parser.epoch_to_load}.pt")
+
+    load_model(file_path=file_path, model=model)
     model.train()
 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
