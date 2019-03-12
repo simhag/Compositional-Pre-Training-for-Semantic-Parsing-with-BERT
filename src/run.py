@@ -109,8 +109,8 @@ def train(arg_parser):
                        dropout_rate=arg_parser.dropout, max_len_pe=arg_parser.max_len_pe)
 
     file_path = os.path.join(arg_parser.models_path, f"{file_name_epoch_indep}_epoch_{arg_parser.epoch_to_load}.pt")
-
-    load_model(file_path=file_path, model=model)
+    if arg_parser.train_load:
+        load_model(file_path=file_path, model=model)
     model.train()
 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -251,7 +251,7 @@ def test(arg_parser):
 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     model = model.to(device)
-
+    model.device = device
     parsing_outputs, gold_queries = decoding(model, test_dataset, arg_parser)
 
     for eval_name, eval_method in evaluation_methods.items():
