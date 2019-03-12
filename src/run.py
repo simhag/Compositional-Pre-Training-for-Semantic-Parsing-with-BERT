@@ -98,10 +98,6 @@ def train(arg_parser):
         os.makedirs(logs_path)
     file_name_epoch_indep = get_model_name(arg_parser)
     recombination = arg_parser.recombination_method
-    train_dataset = get_dataset_finish_by(arg_parser.data_folder, 'train',
-                                          f"{600 + arg_parser.extras_train}_{recombination}_recomb.tsv")
-    test_dataset = get_dataset_finish_by(arg_parser.data_folder, 'dev',
-                                         f"{100 + arg_parser.extras_dev}_{recombination}_recomb.tsv")
     vocab = Vocab(arg_parser.BERT)
     model_type = TSP if arg_parser.TSP_BSP else BSP
     model = model_type(input_vocab=vocab, target_vocab=vocab, d_model=arg_parser.d_model, d_int=arg_parser.d_int,
@@ -110,8 +106,17 @@ def train(arg_parser):
 
     file_path = os.path.join(arg_parser.models_path, f"{file_name_epoch_indep}_epoch_{arg_parser.epoch_to_load}.pt")
     if arg_parser.train_load:
+        train_dataset = get_dataset_finish_by(arg_parser.data_folder, 'train',
+                                              f"{600}_{recombination}_recomb.tsv")
+        test_dataset = get_dataset_finish_by(arg_parser.data_folder, 'dev',
+                                             f"{100}_{recombination}_recomb.tsv")
         load_model(file_path=file_path, model=model)
         print('loaded model')
+    else:
+        train_dataset = get_dataset_finish_by(arg_parser.data_folder, 'train',
+                                              f"{600 + arg_parser.extras_train}_{recombination}_recomb.tsv")
+        test_dataset = get_dataset_finish_by(arg_parser.data_folder, 'dev',
+                                             f"{100 + arg_parser.extras_dev}_{recombination}_recomb.tsv")
     model.train()
 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
