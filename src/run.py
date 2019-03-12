@@ -188,18 +188,22 @@ def test(arg_parser):
                        d_k=arg_parser.d_k, h=arg_parser.h, n_layers=arg_parser.n_layers,
                        dropout_rate=arg_parser.dropout, max_len_pe=arg_parser.max_len_pe)
     load_model(file_path=file_path, model=model)
-    evaluation_methods = {'strict': strict_evaluation, 'jaccard': jaccard, 'jaccard_strict': jaccard_strict}
+    #evaluation_methods = {'strict': strict_evaluation, 'jaccard': jaccard, 'jaccard_strict': jaccard_strict, 'Knowledge-based': knowledge_based_evaluation}
 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     model = model.to(device)
 
     parsing_outputs, gold_queries = decoding(model, test_dataset, arg_parser)
 
-    for eval_name, eval_method in evaluation_methods.items():
-        test_accuracy = eval_method(parsing_outputs, gold_queries)
-        print(f"evaluation method is {eval_name}")
-        print(
-            f"test accuracy, model {eval_name}_{arg_parser.decoding}_{file_name_epoch_indep}_{arg_parser.epoch_to_load}: {test_accuracy:2f}")
+#    for eval_name, eval_method in evaluation_methods.items():
+#        test_accuracy = eval_method(parsing_outputs, gold_queries)
+#        print(f"evaluation method is {eval_name}")
+#        print(
+#            f"test accuracy, model {eval_name}_{arg_parser.decoding}_{file_name_epoch_indep}_{arg_parser.epoch_to_load}: {test_accuracy:2f}")
+    test_accuracy = knowledge_based_evaluation(parsing_outputs, gold_queries)
+    print(f"evaluation method is KB")
+    print(f"test accuracy, model KB_{arg_parser.decoding}_{file_name_epoch_indep}_{arg_parser.epoch_to_load}: {test_accuracy:2f}")
+
 
     outfile = os.path.join(arg_parser.data_folder, os.path.join(arg_parser.out_folder,
                                                                 f"{eval_name}_{arg_parser.decoding}_{file_name_epoch_indep}_{arg_parser.epoch_to_load}.txt"))
@@ -257,103 +261,24 @@ def knowledge_based_evaluation(model_queries, gold_queries, domain = domains.Geo
      '''
      Evaluate the model through knowledge-base metrics
      '''
-     is_correct_list = []
-     tokens_correct_list = []
-     x_len_list = []
-     y_len_list = []
-
-    #print("This is the predicted queries \n", model_queries[0][0])
-    #print("This is the expected queries \n", gold_queries)
-
+     n = len(model_queries)
      if domain:
-    #    all_derivs = [decoding_method(sources=ex, max_len=max_len, beam_size=beam_size) for ex in dataset]
-    #    true_answers = [ex for ex in dataset]
          derivs, denotation_correct_list = domain.compare_answers(model_queries, gold_queries)
-    #else:
-    #    derivs = [decoding_method(model, ex)[0] for ex in dataset]
-    #    denotation_correct_list = None
+     assert n == len(gold_queries)
+     score = 0
+     print("This is denotation_correct_list: \n",denotation_correct_list)
+#     for i in tqdm(range(n)):
+#      if denotation_correct_list[i]:
+#        score += 1
+#     return score / n
 
-     for i, ex in enumerate(dataset):
-         print('Example %d' % i)
-         print('  x      = "%s"' % ex.x_str)
-         print('  y      = "%s"' % ex.y_str)
-         prob = derivs[i].p
-         y_pred_toks = derivs[i].y_toks
-         y_pred_str = ' '.join(y_pred_toks)
-
-     # Compute accuracy metrics
-         is_correct = (y_pred_str == ex.y_str)
-         tokens_correct = sum(a == b for a, b in zip(y_pred_toks, ex.y_toks))
-         is_correct_list.append(is_correct)
-         tokens_correct_list.append(tokens_correct)
-         x_len_list.append(len(ex.x_toks))
-         y_len_list.append(len(ex.y_toks))
-         print('  y_pred = "%s"' % y_pred_str)
-         print('  sequence correct = %s' % is_correct)
-         print('  token accuracy = %d/%d = %g' % (tokens_correct, len(ex.y_toks), float(tokens_correct) / len(ex.y_toks)))
-         if denotation_correct_list:
-             denotation_correct = denotation_correct_list[i]
-             print('  denotation correct = %s' % denotation_correct)
-    #print_accuracy_metrics(name, is_correct_list, tokens_correct_list,
-    #                     x_len_list, y_len_list, denotation_correct_list)
-
+    
 if __name__ == '__main__':
     args = parser.parse_args()
     main(args)
-    #model_queries = ["_answer ( NV , _smallest ( V0 , _state ( V0 ) ) )", "_answer ( A , ( _major ( A ) , _river ( A ) , _loc ( A , B ) , _const ( B , _stateid ( ohio ) ) ) )"]
-    #gold_queries = ["_answer ( NV , _smallest ( V0 , _state ( V0 ) ) )", "_answer ( A , ( _major ( A ) , _river ( A ) , _loc ( A , B ) , _const ( B , _stateid ( ohio ) ) ) )"]
-    #print(knowledge_based_evaluation(model_queries = model_queries, gold_queries = gold_queries))
 
 def strict_evaluation(model_queries, gold_queries):
     n = len(model_queries)
     assert n == len(gold_queries)
     return sum([model_queries[x] == gold_queries[x] for x in range(n)]) / n
-
-
-'''
-def load_dataset(filename, domain):
-  dataset = []
-  with open(filename) as f:
-    for line in f:
-      x, y = line.rstrip('\n').split('\t')
-      if domain:
-        y = domain.preprocess_lf(y)
-      dataset.append((x, y))
-  return dataset
-
-def get_input_vocabulary(dataset):
-  sentences = [x[0] for x in dataset]
-  constructor = VOCAB_TYPES[OPTIONS.input_vocab_type]
-  if OPTIONS.float32:
-    return constructor(sentences, OPTIONS.input_embedding_dim,
-                       unk_cutoff=OPTIONS.unk_cutoff,
-                       float_type=numpy.float32)
-  else:
-    return constructor(sentences, OPTIONS.input_embedding_dim,
-                       unk_cutoff=OPTIONS.unk_cutoff)
-
-def get_output_vocabulary(dataset):
-  sentences = [x[1] for x in dataset]
-  constructor = VOCAB_TYPES[OPTIONS.output_vocab_type]
-  if OPTIONS.float32:
-    return constructor(sentences, OPTIONS.output_embedding_dim,
-                       float_type=numpy.float32)
-  else:
-    return constructor(sentences, OPTIONS.output_embedding_dim)
-
-
-def preprocess_data(model, raw):
-  in_vocabulary = model.in_vocabulary
-  out_vocabulary = model.out_vocabulary
-  lexicon = model.lexicon
-
-  data = []
-  for raw_ex in raw:
-    x_str, y_str = raw_ex
-    ex = Example(x_str, y_str, in_vocabulary, out_vocabulary, lexicon,
-                 reverse_input=OPTIONS.reverse_input)
-    data.append(ex)
-  return data
-'''
-
 
