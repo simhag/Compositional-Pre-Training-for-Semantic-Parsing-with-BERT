@@ -161,8 +161,14 @@ def train(arg_parser):
                                       train_loss / math.ceil(n_train / arg_parser.batch_size),
                                       global_step=epoch)
         if (epoch % arg_parser.save_every == 0) and arg_parser.log and epoch > 0:
-            save_model(arg_parser.models_path, f"{file_name_epoch_indep}_epoch_{epoch}.pt", model,
-                       device)
+            if arg_parser.train_load:
+                save_model(arg_parser.models_path,
+                           f"{file_name_epoch_indep}_epoch_{epoch + arg_parser.epoch_to_load}.pt", model,
+                           device)
+            else:
+                save_model(arg_parser.models_path,
+                           f"{file_name_epoch_indep}_epoch_{epoch + arg_parser.epoch_to_load}.pt", model,
+                           device)
         ## TEST
         test_loss = 0.0
 
