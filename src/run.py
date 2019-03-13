@@ -5,6 +5,7 @@ from utils import data_iterator, get_dataset_finish_by, save_model, load_model, 
 from pytorch_pretrained_bert.modeling import BertModel
 from tokens_vocab import Vocab
 import domains
+from optimizer import NoamOpt
 from semantic_parser import TSP, BSP
 from tensorboardX import SummaryWriter
 import time
@@ -43,6 +44,8 @@ parser.add_argument("--train_load", default=0, type=int)
 parser.add_argument("--batch_size", default=16, type=int)
 parser.add_argument("--clip_grad", default=5.0, type=float)
 parser.add_argument("--lr", default=0.001, type=float)
+parser.add_argument("--optimizer", default='increasing_decreasing', type=str)
+parser.add_argument("--warmups_steps", default=4000, type=int)
 parser.add_argument("--epochs", default=200, type=int)
 parser.add_argument("--save_every", default=5, type=int)
 parser.add_argument("--log", default=True, type=bool)
@@ -125,7 +128,11 @@ def train(arg_parser):
 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     model = model.to(device)
-    optimizer = torch.optim.Adam(model.parameters(), lr=arg_parser.lr)
+    if arg_parser.optimizer == 'increasing_decreasing':
+        optimizer = NoamOpt(model_size = arg_parser.d_model, factor = 1, warmup = arg_parser.warmups_steps, \
+            optimizer = torch.optim.Adam(model.parameters(), lr=0, betas=(0.9, 0.98), eps=1e-9))
+    else:
+        optimizer = torch.optim.Adam(model.parameters(), lr=arg_parser.lr)
     model.device = device
     summary_writer = SummaryWriter(log_dir=logs_path) if arg_parser.log else None
 
@@ -156,9 +163,14 @@ def train(arg_parser):
             # clip gradient
             grad_norm = torch.nn.utils.clip_grad_norm_(model.parameters(), arg_parser.clip_grad)
 
-            optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
+            if arg_parser.optimizer == 'increasing_decreasing':
+                loss.backward()
+                optimizer.step()
+                optimizer.optimizer.zero_grad()
+            else:
+                optimizer.zero_grad()
+                loss.backward()
+                optimizer.step()
 
             # add loss
             running_loss += loss.item()
