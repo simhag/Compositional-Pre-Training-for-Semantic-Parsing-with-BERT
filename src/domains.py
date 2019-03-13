@@ -242,7 +242,7 @@ class GeoqueryDomain(Domain):
 
   def compare_answers(self, true_answers, all_derivs):
     all_lfs = ([self.format_lf(s) for s in true_answers] +
-               [self.format_lf(x) for x in all_derivs])
+               [self.format_lf(d) for x in all_derivs for d in x])
     tf_lines = ['_parse([query], %s).' % lf for lf in all_lfs]
     tf = tempfile.NamedTemporaryFile(suffix='.dlog')
     for line in tf_lines:
@@ -257,11 +257,34 @@ class GeoqueryDomain(Domain):
     true_dens = denotations[:len(true_answers)]
     all_pred_dens = denotations[len(true_answers):]
 
+    # Find the top-scoring derivation that executed without error
+    derivs, pred_dens = pick_derivations(true_dens, all_pred_dens, all_derivs,
+                                         self.is_error)
+
     self.print_failures(true_dens, 'gold')
-    self.print_failures(all_pred_dens, 'predicted')
+    self.print_failures(pred_dens, 'predicted')
     print("This is true_dens: \n", true_dens)
-    print("This is all_pred_dens: \n", all_pred_dens)
-    return all_derivs, [t == p for t, p in zip(true_dens, all_pred_dens)]
+    print("This is all_pred_dens: \n", pred_dens)
+    return derivs, [t == p for t, p in zip(true_dens, pred_dens)]
+
+def pick_derivations(true_dens, all_pred_dens, all_derivs, is_error_fn):
+  # Find the top-scoring derivation that executed without error
+  derivs = []
+  pred_dens = []
+  cur_start = 0
+  for deriv_set in all_derivs:
+    for i in range(len(deriv_set)):
+      cur_denotation = all_pred_dens[cur_start + i]
+      if not is_error_fn(cur_denotation):
+        derivs.append(deriv_set[i])
+        pred_dens.append(cur_denotation)
+        break
+    else:
+      derivs.append(deriv_set[0])  # Default to first derivation
+      pred_dens.append(all_pred_dens[cur_start])
+    cur_start += len(deriv_set)
+  return (derivs, pred_dens)
+
 
 class ArtificialDomain(Domain):
   def get_entity_alignments(self, x, y):

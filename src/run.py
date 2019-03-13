@@ -239,11 +239,15 @@ def decoding(loaded_model, test_dataset, arg_parser):
     loaded_model.eval()
     model_outputs = []
     gold_queries = []
+    count_ = 0
     with torch.no_grad():
         for src_sent_batch, gold_target in tqdm(data_iterator(test_dataset, batch_size=1, shuffle=False), total=280):
             example_hyps = decoding_method(src_sent=src_sent_batch, max_len=max_len, beam_size=beam_size)
-            model_outputs.append(detokenize(example_hyps[0]))
+            model_outputs.append([detokenize(example_hyp) for example_hyp in example_hyps])
             gold_queries.append(gold_target[0])
+            count_ += 1
+            if count_ >= 5:
+            	break
     return model_outputs, gold_queries
 
 
@@ -286,7 +290,7 @@ def jaccard(model_queries, gold_queries):
     assert n == len(gold_queries)
     score = 0
     for i in tqdm(range(n)):
-        score += jaccard_similarity(model_queries[i], gold_queries[i])
+        score += jaccard_similarity(model_queries[i][0], gold_queries[i])
     return score / n
 
 
@@ -296,7 +300,7 @@ def jaccard_strict(model_queries, gold_queries):
     assert n == len(gold_queries)
     score = 0
     for i in tqdm(range(n)):
-        x = jaccard_similarity(model_queries[i], gold_queries[i])
+        x = jaccard_similarity(model_queries[i][0], gold_queries[i])
         if x == 1:
             score += 1
     return score / n
@@ -308,20 +312,20 @@ def knowledge_based_evaluation(model_queries, gold_queries, domain = domains.Geo
      '''
      n = len(model_queries)
      if domain:
-         derivs, denotation_correct_list = domain.compare_answers(model_queries, gold_queries)
+         derivs, denotation_correct_list = domain.compare_answers(true_answers = gold_queries, all_derivs = model_queries)
      assert n == len(gold_queries)
      score = 0
      print("This is denotation_correct_list: \n",denotation_correct_list)
-#     for i in tqdm(range(n)):
-#      if denotation_correct_list[i]:
-#        score += 1
-#     return score / n
+     for i in tqdm(range(n)):
+      if denotation_correct_list[i]:
+        score += 1
+     return score / n
 
 
 def strict_evaluation(model_queries, gold_queries):
     n = len(model_queries)
     assert n == len(gold_queries)
-    return sum([model_queries[x] == gold_queries[x] for x in range(n)]) / n
+    return sum([model_queries[x][0] == gold_queries[x] for x in range(n)]) / n
 
 
 if __name__ == '__main__':
