@@ -282,7 +282,7 @@ def decoding(loaded_model, test_dataset, arg_parser):
             print(gold_target[0])
             gold_queries.append(gold_target[0])
             count_ += 1
-            if count_ >= 5:
+            if count_ >= 25:
                 break
     return model_outputs, gold_queries
 

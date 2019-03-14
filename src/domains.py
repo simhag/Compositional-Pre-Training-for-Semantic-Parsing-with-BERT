@@ -254,6 +254,8 @@ class GeoqueryDomain(Domain):
     denotations = [self.get_denotation(line.decode())
                    for line in msg.split(b'\n')
                    if line.startswith(b'        Example')]
+    if len(denotations) <= 1:
+        return None, None
     true_dens = denotations[:len(true_answers)]
     all_pred_dens = denotations[len(true_answers):]
 
