@@ -248,6 +248,9 @@ def decoding(loaded_model, test_dataset, arg_parser):
         for src_sent_batch, gold_target in tqdm(data_iterator(test_dataset, batch_size=1, shuffle=False), total=280):
             example_hyps = decoding_method(src_sent=src_sent_batch, max_len=max_len, beam_size=beam_size)
             model_outputs.append([detokenize(example_hyp) for example_hyp in example_hyps])
+            # print(example_hyps)
+            print(model_outputs[count_])
+            print(gold_target[0])
             gold_queries.append(gold_target[0])
             count_ += 1
             if count_ >= 5:
@@ -258,17 +261,17 @@ def decoding(loaded_model, test_dataset, arg_parser):
 def test(arg_parser):
     file_name_epoch_indep = get_model_name(arg_parser)
     recombination = arg_parser.recombination_method
-    test_dataset = get_dataset_finish_by(arg_parser.data_folder, 'test',
-                                         f"{recombination}_recomb.tsv")
-    vocab = Vocab(arg_parser.BERT)
-    file_path = os.path.join(arg_parser.models_path, f"{file_name_epoch_indep}_epoch_{arg_parser.epoch_to_load}.pt")
+    test_dataset = get_dataset_finish_by(arg_parser.data_folder, 'test', f"{recombination}_recomb.tsv")
+    vocab = Vocab(f'bert-{arg_parser.BERT}-uncased')
+    file_path = os.path.join(arg_parser.models_path, "TSP_epoch_195.pt")#f"{file_name_epoch_indep}_epoch_{arg_parser.epoch_to_load}.pt")
     model_type = TSP if arg_parser.TSP_BSP else BSP
     model = model_type(input_vocab=vocab, target_vocab=vocab, d_model=arg_parser.d_model, d_int=arg_parser.d_int,
                        d_k=arg_parser.d_k, h=arg_parser.h, n_layers=arg_parser.n_layers,
                        dropout_rate=arg_parser.dropout, max_len_pe=arg_parser.max_len_pe)
+
     load_model(file_path=file_path, model=model)
-    evaluation_methods = {'strict': strict_evaluation, 'jaccard': jaccard, 'jaccard_strict': jaccard_strict,
-                          'Knowledge-based': knowledge_based_evaluation}
+    evaluation_methods = {'strict': strict_evaluation, 'jaccard': jaccard, 'jaccard_strict': jaccard_strict}#,
+                          # 'Knowledge-based': knowledge_based_evaluation}
 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     model = model.to(device)
