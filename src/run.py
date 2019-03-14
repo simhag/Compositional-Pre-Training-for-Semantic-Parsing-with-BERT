@@ -22,32 +22,32 @@ parser.add_argument("--data_folder", type=str, default="geoQueryData")
 parser.add_argument("--out_folder", type=str, default="outputs")
 parser.add_argument("--log_dir", default='logs', type=str)
 parser.add_argument("--subdir", default="run1", type=str)
-parser.add_argument("--models_path", default='models', type=str)
+parser.add_argument("--models_path", default='models_to_keep', type=str)
 # MODEL
 parser.add_argument("--TSP_BSP", default=1, type=int, help="1: TSP model, 0:BSP")
 parser.add_argument("--BERT", default="base", type=str, help="bert-base-uncased or bert-large-uncased (large)")
 # MODEL PARAMETERS
-parser.add_argument("--d_model", default=128, type=int)
-parser.add_argument("--d_int", default=512, type=int)
+parser.add_argument("--d_model", default=512, type=int)
+parser.add_argument("--d_int", default=2048, type=int)
 parser.add_argument("--h", default=8, type=int)
-parser.add_argument("--d_k", default=16, type=int)
+parser.add_argument("--d_k", default=64, type=int)
 parser.add_argument("--dropout", default=0.1, type=float)
-parser.add_argument("--n_layers", default=2, type=int)
+parser.add_argument("--n_layers", default=6, type=int)
 parser.add_argument("--max_len_pe", default=200, type=int)
 # DATA RECOMBINATION
 parser.add_argument("--recombination_method", default='entity', type=str)
 parser.add_argument("--extras_train", default=600, type=int)
 parser.add_argument("--extras_dev", default=100, type=int)
 # TRAINING PARAMETERS
-parser.add_argument("--train_arg", default=1, type=int)
+parser.add_argument("--train_arg", default=0, type=int)
 parser.add_argument("--train_load", default=0, type=int)
-parser.add_argument("--batch_size", default=16, type=int)
+parser.add_argument("--batch_size", default=32, type=int)
 parser.add_argument("--clip_grad", default=5.0, type=float)
 parser.add_argument("--lr", default=0.001, type=float)
 parser.add_argument("--optimizer", default=1, type=int)
 parser.add_argument("--warmups_steps", default=4000, type=int)
 parser.add_argument("--epochs", default=200, type=int)
-parser.add_argument("--save_every", default=5, type=int)
+parser.add_argument("--save_every", default=50, type=int)
 parser.add_argument("--log", default=True, type=bool)
 parser.add_argument("--shuffle", default=True, type=bool)
 # TESTING PARAMETERS
@@ -223,7 +223,7 @@ def jaccard(model_queries, gold_queries):
     assert n == len(gold_queries)
     score = 0
     for i in tqdm(range(n)):
-        score += jaccard_similarity(model_queries[i], gold_queries[i])
+        score += jaccard_similarity(model_queries[i][0], gold_queries[i])
     return score / n
 
 
@@ -233,7 +233,7 @@ def jaccard_strict(model_queries, gold_queries):
     assert n == len(gold_queries)
     score = 0
     for i in tqdm(range(n)):
-        x = jaccard_similarity(model_queries[i], gold_queries[i])
+        x = jaccard_similarity(model_queries[i][0], gold_queries[i])
         if x == 1:
             score += 1
     return score / n
@@ -242,7 +242,7 @@ def jaccard_strict(model_queries, gold_queries):
 def strict_evaluation(model_queries, gold_queries):
     n = len(model_queries)
     assert n == len(gold_queries)
-    return sum([model_queries[x] == gold_queries[x] for x in range(n)]) / n
+    return sum([model_queries[x][0] == gold_queries[x] for x in range(n)]) / n
 
 
 def knowledge_based_evaluation(model_queries, gold_queries, domain=domains.GeoqueryDomain()):
@@ -277,13 +277,7 @@ def decoding(loaded_model, test_dataset, arg_parser):
         for src_sent_batch, gold_target in tqdm(data_iterator(test_dataset, batch_size=1, shuffle=False), total=280):
             example_hyps = decoding_method(src_sent=src_sent_batch, max_len=max_len, beam_size=beam_size)
             model_outputs.append([detokenize(example_hyp) for example_hyp in example_hyps])
-            # print(example_hyps)
-            print(model_outputs[count_])
-            print(gold_target[0])
             gold_queries.append(gold_target[0])
-            count_ += 1
-            if count_ >= 25:
-                break
     return model_outputs, gold_queries
 
 
@@ -299,8 +293,7 @@ def test(arg_parser):
                        dropout_rate=arg_parser.dropout, max_len_pe=arg_parser.max_len_pe)
 
     load_model(file_path=file_path, model=model)
-    evaluation_methods = {'strict': strict_evaluation, 'jaccard': jaccard, 'jaccard_strict': jaccard_strict,
-                          'Knowledge-based': knowledge_based_evaluation}
+    evaluation_methods = {'Knowledge-based':knowledge_based_evaluation, 'strict': strict_evaluation, 'jaccard': jaccard, 'jaccard_strict': jaccard_strict}
 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     model = model.to(device)

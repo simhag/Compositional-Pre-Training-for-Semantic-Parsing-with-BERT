@@ -246,7 +246,7 @@ class GeoqueryDomain(Domain):
     tf_lines = ['_parse([query], %s).' % lf for lf in all_lfs]
     tf = tempfile.NamedTemporaryFile(suffix='.dlog')
     for line in tf_lines:
-      print(line)
+      #print(line)
       tf.write(line.encode())
     tf.flush()
     msg = subprocess.check_output(['evaluator/geoquery', tf.name])
@@ -265,8 +265,8 @@ class GeoqueryDomain(Domain):
 
     self.print_failures(true_dens, 'gold')
     self.print_failures(pred_dens, 'predicted')
-    print("This is true_dens: \n", true_dens)
-    print("This is all_pred_dens: \n", pred_dens)
+    #print("This is true_dens: \n", true_dens)
+    #print("This is all_pred_dens: \n", pred_dens)
     return derivs, [t == p for t, p in zip(true_dens, pred_dens)]
 
 def pick_derivations(true_dens, all_pred_dens, all_derivs, is_error_fn):

@@ -157,26 +157,33 @@ def get_dataset_finish_by(data_folder, set_type, finish_by):
 
 def detokenize(tokens_list):
     position = 0
+    n = len(tokens_list)
     to_upper_tokens = {'nv'} | {'v' + str(i) for i in range(10)}
     for token in tokens_list:
-        if token.startswith('##'):
+        if token.startswith('##') and position>0:
             tokens_list[position - 1] += token[2:]
             tokens_list = tokens_list[:position] + tokens_list[position + 1:]
+            n -= 1
             if tokens_list[position - 1] in to_upper_tokens:
                 tokens_list[position - 1] = tokens_list[position - 1].upper()
-        elif token.startswith('_') and tokens_list[position + 1] != ')':
-            tokens_list[position] += tokens_list[position + 1]
-            tokens_list = tokens_list[:position + 1] + tokens_list[position + 2:]
+        elif token.startswith('_'):
+            if (position+1)<n and tokens_list[position + 1] != ')':
+                tokens_list[position] += tokens_list[position + 1]
+                tokens_list = tokens_list[:position + 1] + tokens_list[position + 2:]
+                n -= 1
         elif token.startswith('\\'):
-            tokens_list[position] += tokens_list[position + 1]
-            tokens_list = tokens_list[:position + 1] + tokens_list[position + 2:]
+            if position+1 <n:
+                tokens_list[position] += tokens_list[position + 1]
+                tokens_list = tokens_list[:position + 1] + tokens_list[position + 2:]
+                n -= 1
         else:
             position += 1
-    position = 0
     for i, token in enumerate(tokens_list):
-        if token.startswith('_') and tokens_list[position + 1].startswith('_'):
-            tokens_list[position] += tokens_list[position + 1]
-            tokens_list = tokens_list[:position + 1] + tokens_list[position + 2:]
+        if token.startswith('_'):
+            if position+1 <n and tokens_list[position + 1].startswith('_'):
+                tokens_list[position] += tokens_list[position + 1]
+                tokens_list = tokens_list[:position + 1] + tokens_list[position + 2:]
+                n -= 1
         else:
             position += 1
     return ' '.join(tokens_list).replace(' . ', '.')
