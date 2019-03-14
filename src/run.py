@@ -44,7 +44,7 @@ parser.add_argument("--train_load", default=0, type=int)
 parser.add_argument("--batch_size", default=16, type=int)
 parser.add_argument("--clip_grad", default=5.0, type=float)
 parser.add_argument("--lr", default=0.001, type=float)
-parser.add_argument("--optimizer", default='increasing_decreasing', type=str)
+parser.add_argument("--optimizer", default=1, type=int)
 parser.add_argument("--warmups_steps", default=4000, type=int)
 parser.add_argument("--epochs", default=200, type=int)
 parser.add_argument("--save_every", default=5, type=int)
@@ -101,10 +101,7 @@ def train(arg_parser):
         os.makedirs(logs_path)
     file_name_epoch_indep = get_model_name(arg_parser)
     recombination = arg_parser.recombination_method
-    train_dataset = get_dataset_finish_by(arg_parser.data_folder, 'train',
-                                          f"{600 + arg_parser.extras_train}_{recombination}_recomb.tsv")
-    test_dataset = get_dataset_finish_by(arg_parser.data_folder, 'dev',
-                                         f"{100 + arg_parser.extras_dev}_{recombination}_recomb.tsv")
+
     vocab = Vocab(f'bert-{arg_parser.BERT}-uncased')
     model_type = TSP if arg_parser.TSP_BSP else BSP
     model = model_type(input_vocab=vocab, target_vocab=vocab, d_model=arg_parser.d_model, d_int=arg_parser.d_int,
@@ -128,9 +125,9 @@ def train(arg_parser):
 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     model = model.to(device)
-    if arg_parser.optimizer == 'increasing_decreasing':
-        optimizer = NoamOpt(model_size = arg_parser.d_model, factor = 1, warmup = arg_parser.warmups_steps, \
-            optimizer = torch.optim.Adam(model.parameters(), lr=0, betas=(0.9, 0.98), eps=1e-9))
+    if arg_parser.optimizer:
+        optimizer = NoamOpt(model_size=arg_parser.d_model, factor=1, warmup=arg_parser.warmups_steps, \
+                            optimizer=torch.optim.Adam(model.parameters(), lr=0, betas=(0.9, 0.98), eps=1e-9))
     else:
         optimizer = torch.optim.Adam(model.parameters(), lr=arg_parser.lr)
     model.device = device
@@ -163,7 +160,7 @@ def train(arg_parser):
             # clip gradient
             grad_norm = torch.nn.utils.clip_grad_norm_(model.parameters(), arg_parser.clip_grad)
 
-            if arg_parser.optimizer == 'increasing_decreasing':
+            if arg_parser.optimizer:
                 loss.backward()
                 optimizer.step()
                 optimizer.optimizer.zero_grad()
@@ -248,6 +245,26 @@ def strict_evaluation(model_queries, gold_queries):
     return sum([model_queries[x] == gold_queries[x] for x in range(n)]) / n
 
 
+def knowledge_based_evaluation(model_queries, gold_queries, domain=domains.GeoqueryDomain()):
+    '''
+    Evaluate the model through knowledge-base metrics
+    '''
+    n_correct = 0
+    n_wrong = 0
+    score = 0
+    for i, gold_target in tqdm(enumerate(gold_queries)):
+        derivs, denotation_correct_list = domain.compare_answers(true_answers=[gold_target],
+                                                                 all_derivs=[model_queries[i]])
+        if derivs is not None:
+            n_correct += 1
+            score += int(denotation_correct_list[0])
+            assert len(denotation_correct_list) == 1
+        else:
+            n_wrong += 1
+    print(f"denotation matching fucked up {n_wrong / (n_correct + n_wrong):.2f} of the time, thks boloss")
+    return score / n_correct
+
+
 def decoding(loaded_model, test_dataset, arg_parser):
     beam_size = arg_parser.beam_size
     max_len = arg_parser.max_decode_len
@@ -275,15 +292,15 @@ def test(arg_parser):
     recombination = arg_parser.recombination_method
     test_dataset = get_dataset_finish_by(arg_parser.data_folder, 'test', f"{recombination}_recomb.tsv")
     vocab = Vocab(f'bert-{arg_parser.BERT}-uncased')
-    file_path = os.path.join(arg_parser.models_path, "TSP_epoch_195.pt")#f"{file_name_epoch_indep}_epoch_{arg_parser.epoch_to_load}.pt")
+    file_path = os.path.join(arg_parser.models_path, f"{file_name_epoch_indep}_epoch_{arg_parser.epoch_to_load}.pt")
     model_type = TSP if arg_parser.TSP_BSP else BSP
     model = model_type(input_vocab=vocab, target_vocab=vocab, d_model=arg_parser.d_model, d_int=arg_parser.d_int,
                        d_k=arg_parser.d_k, h=arg_parser.h, n_layers=arg_parser.n_layers,
                        dropout_rate=arg_parser.dropout, max_len_pe=arg_parser.max_len_pe)
 
     load_model(file_path=file_path, model=model)
-    evaluation_methods = {'strict': strict_evaluation, 'jaccard': jaccard, 'jaccard_strict': jaccard_strict}#,
-                          # 'Knowledge-based': knowledge_based_evaluation}
+    evaluation_methods = {'strict': strict_evaluation, 'jaccard': jaccard, 'jaccard_strict': jaccard_strict,
+                          'Knowledge-based': knowledge_based_evaluation}
 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     model = model.to(device)
@@ -302,50 +319,6 @@ def test(arg_parser):
         for parsing_output in parsing_outputs:
             f.write(''.join(parsing_output) + '\n')
     return None
-
-
-def jaccard(model_queries, gold_queries):
-    n = len(model_queries)
-    print(n)
-    assert n == len(gold_queries)
-    score = 0
-    for i in tqdm(range(n)):
-        score += jaccard_similarity(model_queries[i][0], gold_queries[i])
-    return score / n
-
-
-def jaccard_strict(model_queries, gold_queries):
-    n = len(model_queries)
-    print(n)
-    assert n == len(gold_queries)
-    score = 0
-    for i in tqdm(range(n)):
-        x = jaccard_similarity(model_queries[i][0], gold_queries[i])
-        if x == 1:
-            score += 1
-    return score / n
-
-
-def knowledge_based_evaluation(model_queries, gold_queries, domain=domains.GeoqueryDomain()):
-    '''
-    Evaluate the model through knowledge-base metrics
-    '''
-    n = len(model_queries)
-    if domain:
-        derivs, denotation_correct_list = domain.compare_answers(true_answers=gold_queries, all_derivs=model_queries)
-    assert n == len(gold_queries)
-    score = 0
-    print("This is denotation_correct_list: \n", denotation_correct_list)
-    for i in tqdm(range(n)):
-        if denotation_correct_list[i]:
-            score += 1
-    return score / n
-
-
-def strict_evaluation(model_queries, gold_queries):
-    n = len(model_queries)
-    assert n == len(gold_queries)
-    return sum([model_queries[x][0] == gold_queries[x] for x in range(n)]) / n
 
 
 if __name__ == '__main__':
