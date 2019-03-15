@@ -290,7 +290,7 @@ def test(arg_parser):
     model_type = TSP if arg_parser.TSP_BSP else BSP
     model = model_type(input_vocab=vocab, target_vocab=vocab, d_model=arg_parser.d_model, d_int=arg_parser.d_int,
                        d_k=arg_parser.d_k, h=arg_parser.h, n_layers=arg_parser.n_layers,
-                       dropout_rate=arg_parser.dropout, max_len_pe=arg_parser.max_len_pe)
+                       dropout_rate=arg_parser.dropout, max_len_pe=arg_parser.max_len_pe, bert_name=arg_parser.BERT)
 
     load_model(file_path=file_path, model=model)
     evaluation_methods = {'Knowledge-based':knowledge_based_evaluation, 'strict': strict_evaluation, 'jaccard': jaccard, 'jaccard_strict': jaccard_strict}
