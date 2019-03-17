@@ -32,12 +32,12 @@ parser.add_argument("--d_int", default=2048, type=int)
 parser.add_argument("--h", default=8, type=int)
 parser.add_argument("--d_k", default=64, type=int)
 parser.add_argument("--dropout", default=0.1, type=float)
-parser.add_argument("--n_layers", default=6, type=int)
+parser.add_argument("--n_layers", default=2, type=int)
 parser.add_argument("--max_len_pe", default=200, type=int)
 # DATA RECOMBINATION
 parser.add_argument("--recombination_method", default='entity', type=str)
-parser.add_argument("--extras_train", default=600, type=int)
-parser.add_argument("--extras_dev", default=100, type=int)
+parser.add_argument("--extras_train", default=0, type=int)
+parser.add_argument("--extras_dev", default=0, type=int)
 # TRAINING PARAMETERS
 parser.add_argument("--train_arg", default=0, type=int)
 parser.add_argument("--train_load", default=0, type=int)
@@ -52,7 +52,7 @@ parser.add_argument("--log", default=True, type=bool)
 parser.add_argument("--shuffle", default=True, type=bool)
 # TESTING PARAMETERS
 parser.add_argument("--test_arg", default=1, type=int)
-parser.add_argument("--epoch_to_load", default=55, type=int)
+parser.add_argument("--epoch_to_load", default=0, type=int)
 parser.add_argument("--decoding", default='beam_search', type=str)
 parser.add_argument("--beam_size", default=5, type=int)
 parser.add_argument("--max_decode_len", default=250, type=int)
@@ -92,7 +92,7 @@ def get_model_name(argparser):
         base_model = 'TSP'
     else:
         base_model = 'BSP'
-    return f"{base_model}_d_model{argparser.d_model}_layers{argparser.n_layers}_recomb{argparser.recombination_method}_extrastrain{argparser.extras_train}_extrasdev{argparser.extras_dev}"
+    return base_model #f"{base_model}_d_model{argparser.d_model}_layers{argparser.n_layers}_recomb{argparser.recombination_method}_extrastrain{argparser.extras_train}_extrasdev{argparser.extras_dev}"
 
 
 def train(arg_parser):
@@ -277,7 +277,6 @@ def decoding(loaded_model, test_dataset, arg_parser):
     model_outputs_kb = []
     gold_queries_kb = []
     gold_queries = []
-    count_ = 0
     with torch.no_grad():
         for src_sent_batch, gold_target in tqdm(data_iterator(test_dataset, batch_size=1, shuffle=False), total=280):
             example_hyps = decoding_method(src_sent=src_sent_batch, max_len=max_len, beam_size=beam_size)
@@ -288,22 +287,18 @@ def decoding(loaded_model, test_dataset, arg_parser):
             strings_model, string_gold = format_lf(strings_model, string_gold)
             model_outputs.append(strings_model)
             gold_queries.append(string_gold)
-            count_ += 1
-            if count_ > 5:
-                break
     return model_outputs, gold_queries, model_outputs_kb, gold_queries_kb
 
 def test(arg_parser):
     file_name_epoch_indep = get_model_name(arg_parser)
     recombination = arg_parser.recombination_method
-    test_dataset = get_dataset_finish_by(arg_parser.data_folder, 'test', f"{recombination}_recomb.tsv")
+    test_dataset = get_dataset_finish_by(arg_parser.data_folder, 'test', '280.tsv') #get_dataset_finish_by(arg_parser.data_folder, 'test', f"{recombination}_recomb.tsv")
     vocab = Vocab(f'bert-{arg_parser.BERT}-uncased')
     file_path = os.path.join(arg_parser.models_path, f"{file_name_epoch_indep}_epoch_{arg_parser.epoch_to_load}.pt")
     model_type = TSP if arg_parser.TSP_BSP else BSP
     model = model_type(input_vocab=vocab, target_vocab=vocab, d_model=arg_parser.d_model, d_int=arg_parser.d_int,
                        d_k=arg_parser.d_k, h=arg_parser.h, n_layers=arg_parser.n_layers,
                        dropout_rate=arg_parser.dropout, max_len_pe=arg_parser.max_len_pe, bert_name=arg_parser.BERT)
-
     load_model(file_path=file_path, model=model)
     evaluation_methods = {'Knowledge-based':knowledge_based_evaluation, 'strict': strict_evaluation, 'jaccard': jaccard, 'jaccard_strict': jaccard_strict}
 
