@@ -21,38 +21,38 @@ parser = ArgumentParser()
 parser.add_argument("--data_folder", type=str, default="geoQueryData")
 parser.add_argument("--out_folder", type=str, default="outputs")
 parser.add_argument("--log_dir", default='logs', type=str)
-parser.add_argument("--subdir", default="run1", type=str)
-parser.add_argument("--models_path", default='models', type=str)
+parser.add_argument("--subdir", default="BERT_large", type=str)
+parser.add_argument("--models_path", default='models_to_keep', type=str)
 # MODEL
 parser.add_argument("--TSP_BSP", default=0, type=int, help="1: TSP model, 0:BSP")
 parser.add_argument("--BERT", default="base", type=str, help="bert-base-uncased or bert-large-uncased (large)")
 # MODEL PARAMETERS
-parser.add_argument("--d_model", default=512, type=int)
-parser.add_argument("--d_int", default=2048, type=int)
+parser.add_argument("--d_model", default=256, type=int)
+parser.add_argument("--d_int", default=1024, type=int)
 parser.add_argument("--h", default=8, type=int)
-parser.add_argument("--d_k", default=64, type=int)
+parser.add_argument("--d_k", default=32, type=int)
 parser.add_argument("--dropout", default=0.1, type=float)
-parser.add_argument("--n_layers", default=6, type=int)
-parser.add_argument("--max_len_pe", default=200, type=int)
+parser.add_argument("--n_layers", default=4, type=int)
+parser.add_argument("--max_len_pe", default=350, type=int)
 # DATA RECOMBINATION
-parser.add_argument("--recombination_method", default='entity', type=str)
-parser.add_argument("--extras_train", default=600, type=int)
-parser.add_argument("--extras_dev", default=100, type=int)
+parser.add_argument("--recombination_method", default='entity+nesting+concat2', type=str)
+parser.add_argument("--extras_train", default=1800, type=int)
+parser.add_argument("--extras_dev", default=300, type=int)
 # TRAINING PARAMETERS
-parser.add_argument("--train_arg", default=0, type=int)
+parser.add_argument("--train_arg", default=1, type=int)
 parser.add_argument("--train_load", default=0, type=int)
 parser.add_argument("--batch_size", default=32, type=int)
 parser.add_argument("--clip_grad", default=5.0, type=float)
 parser.add_argument("--lr", default=0.001, type=float)
 parser.add_argument("--optimizer", default=1, type=int)
 parser.add_argument("--warmups_steps", default=4000, type=int)
-parser.add_argument("--epochs", default=200, type=int)
-parser.add_argument("--save_every", default=50, type=int)
+parser.add_argument("--epochs", default=201, type=int)
+parser.add_argument("--save_every", default=25, type=int)
 parser.add_argument("--log", default=True, type=bool)
 parser.add_argument("--shuffle", default=True, type=bool)
 # TESTING PARAMETERS
-parser.add_argument("--test_arg", default=1, type=int)
-parser.add_argument("--epoch_to_load", default=55, type=int)
+parser.add_argument("--test_arg", default=0, type=int)
+parser.add_argument("--epoch_to_load", default=0, type=int)
 parser.add_argument("--decoding", default='beam_search', type=str)
 parser.add_argument("--beam_size", default=5, type=int)
 parser.add_argument("--max_decode_len", default=250, type=int)
@@ -264,7 +264,7 @@ def knowledge_based_evaluation(model_queries, gold_queries, domain=domains.Geoqu
             assert len(denotation_correct_list) == 1
         else:
             n_wrong += 1
-    print(f"denotation matching fucked up {n_wrong / (n_correct + n_wrong):.2f} of the time, thks boloss")
+    print(f"denotation matching did not work {n_wrong / (n_correct + n_wrong):.2f} of the time")
     return score / n_correct
 
 
@@ -284,13 +284,15 @@ def decoding(loaded_model, test_dataset, arg_parser):
             strings_model = [detokenize(example_hyp) for example_hyp in example_hyps]
             string_gold = gold_target[0]
             model_outputs_kb.append(strings_model)
-            gold_queries_kb.append(model_outputs)
+            gold_queries_kb.append(string_gold)
             strings_model, string_gold = format_lf(strings_model, string_gold)
             model_outputs.append(strings_model)
             gold_queries.append(string_gold)
-            count_ += 1
-            if count_ > 5:
+            print(strings_model)
+            print(string_gold)
+            if count_ >= 5:
                 break
+            count_ +=1
     return model_outputs, gold_queries, model_outputs_kb, gold_queries_kb
 
 def test(arg_parser):
@@ -313,7 +315,7 @@ def test(arg_parser):
     parsing_outputs, gold_queries, parsing_kb, gold_kb = decoding(model, test_dataset, arg_parser)
 
     for eval_name, eval_method in evaluation_methods.items():
-        if eval_method == 'Knowledge-based':
+        if eval_name == 'Knowledge-based':
             test_accuracy = eval_method(parsing_kb, gold_kb)
         else:
             test_accuracy = eval_method(parsing_outputs, gold_queries)
