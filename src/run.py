@@ -24,7 +24,7 @@ parser.add_argument("--log_dir", default='logs', type=str)
 parser.add_argument("--subdir", default="run1", type=str)
 parser.add_argument("--models_path", default='models', type=str)
 # MODEL
-parser.add_argument("--TSP_BSP", default=1, type=int, help="1: TSP model, 0:BSP")
+parser.add_argument("--TSP_BSP", default=0, type=int, help="1: TSP model, 0:BSP")
 parser.add_argument("--BERT", default="base", type=str, help="bert-base-uncased or bert-large-uncased (large)")
 # MODEL PARAMETERS
 parser.add_argument("--d_model", default=128, type=int)
@@ -52,7 +52,7 @@ parser.add_argument("--log", default=True, type=bool)
 parser.add_argument("--shuffle", default=True, type=bool)
 # TESTING PARAMETERS
 parser.add_argument("--test_arg", default=1, type=int)
-parser.add_argument("--epoch_to_load", default=195, type=int)
+parser.add_argument("--epoch_to_load", default=55, type=int)
 parser.add_argument("--decoding", default='beam_search', type=str)
 parser.add_argument("--beam_size", default=5, type=int)
 parser.add_argument("--max_decode_len", default=250, type=int)
@@ -209,6 +209,9 @@ def train(arg_parser):
 
     return None
 
+def format_lf(strings_model, string_gold):
+    return [''.join(string_model.split(' ')) for string_model in strings_model], ''.join(string_gold.split(' '))
+
 
 def format_lf(strings_model, string_gold):
     return [''.join(string_model.split(' ')) for string_model in strings_model], ''.join(string_gold.split(' '))
@@ -275,6 +278,8 @@ def decoding(loaded_model, test_dataset, arg_parser):
     decoding_method = loaded_model.beam_search if arg_parser.decoding == 'beam_search' else loaded_model.decode_greedy
     loaded_model.eval()
     model_outputs = []
+    model_outputs_kb = []
+    gold_queries_kb = []
     gold_queries = []
     count_ = 0
     with torch.no_grad():
@@ -282,17 +287,15 @@ def decoding(loaded_model, test_dataset, arg_parser):
             example_hyps = decoding_method(src_sent=src_sent_batch, max_len=max_len, beam_size=beam_size)
             strings_model = [detokenize(example_hyp) for example_hyp in example_hyps]
             string_gold = gold_target[0]
+            model_outputs_kb.append(strings_model)
+            gold_queries_kb.append(model_outputs)
             strings_model, string_gold = format_lf(strings_model, string_gold)
             model_outputs.append(strings_model)
-            print(type(strings_model[0]))
             gold_queries.append(string_gold)
-            print(strings_model[0])
-            print(string_gold)
             count_ += 1
             if count_ > 5:
                 break
-    return model_outputs, gold_queries
-
+    return model_outputs, gold_queries, model_outputs_kb, gold_queries_kb
 
 def test(arg_parser):
     file_name_epoch_indep = get_model_name(arg_parser)
@@ -311,10 +314,13 @@ def test(arg_parser):
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     model = model.to(device)
     model.device = device
-    parsing_outputs, gold_queries = decoding(model, test_dataset, arg_parser)
+    parsing_outputs, gold_queries, parsing_kb, gold_kb = decoding(model, test_dataset, arg_parser)
 
     for eval_name, eval_method in evaluation_methods.items():
-        test_accuracy = eval_method(parsing_outputs, gold_queries)
+        if eval_method == 'Knowledge-based':
+            test_accuracy = eval_method(parsing_kb, gold_kb)
+        else:
+            test_accuracy = eval_method(parsing_outputs, gold_queries)
         print(f"evaluation method is {eval_name}")
         print(
             f"test accuracy, model {eval_name}_{arg_parser.decoding}_{file_name_epoch_indep}_{arg_parser.epoch_to_load}: {test_accuracy:2f}")

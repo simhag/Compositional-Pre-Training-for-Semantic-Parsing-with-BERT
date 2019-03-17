@@ -1,5 +1,0 @@
-_answer(a,_smallest(b,(_state(a),_area(a,b))))
-_answer(a,_longest(a,(_river(a),_lo##c(a,b),_con##st(b,_country##id(usa)))))
-_answer(a,_highest(a,(_place(a),_lo##c(a,b),_state(b),_con##st(b,_state##id('rhode('))))
-_answer(a,(_major(a),_river(a),_lo##c(a,b),_con##st(b,_state##id(ohio))))
-_answer(a,(_major(a),_river(a),_lo##c(a,b),_con##st(b,_state##id(florida))))
