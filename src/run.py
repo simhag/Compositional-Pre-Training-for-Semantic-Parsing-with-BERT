@@ -22,17 +22,17 @@ parser.add_argument("--data_folder", type=str, default="geoQueryData")
 parser.add_argument("--out_folder", type=str, default="outputs")
 parser.add_argument("--log_dir", default='logs', type=str)
 parser.add_argument("--subdir", default="run1", type=str)
-parser.add_argument("--models_path", default='models_to_keep', type=str)
+parser.add_argument("--models_path", default='models', type=str)
 # MODEL
 parser.add_argument("--TSP_BSP", default=1, type=int, help="1: TSP model, 0:BSP")
 parser.add_argument("--BERT", default="base", type=str, help="bert-base-uncased or bert-large-uncased (large)")
 # MODEL PARAMETERS
-parser.add_argument("--d_model", default=512, type=int)
-parser.add_argument("--d_int", default=2048, type=int)
+parser.add_argument("--d_model", default=128, type=int)
+parser.add_argument("--d_int", default=128, type=int)
 parser.add_argument("--h", default=8, type=int)
-parser.add_argument("--d_k", default=64, type=int)
+parser.add_argument("--d_k", default=16, type=int)
 parser.add_argument("--dropout", default=0.1, type=float)
-parser.add_argument("--n_layers", default=6, type=int)
+parser.add_argument("--n_layers", default=2, type=int)
 parser.add_argument("--max_len_pe", default=200, type=int)
 # DATA RECOMBINATION
 parser.add_argument("--recombination_method", default='entity', type=str)
@@ -52,7 +52,7 @@ parser.add_argument("--log", default=True, type=bool)
 parser.add_argument("--shuffle", default=True, type=bool)
 # TESTING PARAMETERS
 parser.add_argument("--test_arg", default=1, type=int)
-parser.add_argument("--epoch_to_load", default=5, type=int)
+parser.add_argument("--epoch_to_load", default=195, type=int)
 parser.add_argument("--decoding", default='beam_search', type=str)
 parser.add_argument("--beam_size", default=5, type=int)
 parser.add_argument("--max_decode_len", default=250, type=int)
@@ -92,7 +92,7 @@ def get_model_name(argparser):
         base_model = 'TSP'
     else:
         base_model = 'BSP'
-    return f"{base_model}_d_model{argparser.d_model}_layers{argparser.n_layers}_recomb{argparser.recombination_method}_extrastrain{argparser.extras_train}_extrasdev{argparser.extras_dev}"
+    return base_model # f"{base_model}_d_model{argparser.d_model}_layers{argparser.n_layers}_recomb{argparser.recombination_method}_extrastrain{argparser.extras_train}_extrasdev{argparser.extras_dev}"
 
 
 def train(arg_parser):
@@ -210,6 +210,10 @@ def train(arg_parser):
     return None
 
 
+def format_lf(strings_model, string_gold):
+    return [''.join(string_model.split(' ')) for string_model in strings_model], ''.join(string_gold.split(' '))
+
+
 def jaccard_similarity(tokens1, tokens2):
     set1 = set([char for char in tokens1])
     set2 = set([char for char in tokens2])
@@ -233,7 +237,7 @@ def jaccard_strict(model_queries, gold_queries):
     assert n == len(gold_queries)
     score = 0
     for i in tqdm(range(n)):
-        x = jaccard_similarity(model_queries[i][0], gold_queries[i])
+        x = jaccard_similarity(tokens1=model_queries[i][0], tokens2=gold_queries[i])
         if x == 1:
             score += 1
     return score / n
@@ -276,15 +280,24 @@ def decoding(loaded_model, test_dataset, arg_parser):
     with torch.no_grad():
         for src_sent_batch, gold_target in tqdm(data_iterator(test_dataset, batch_size=1, shuffle=False), total=280):
             example_hyps = decoding_method(src_sent=src_sent_batch, max_len=max_len, beam_size=beam_size)
-            model_outputs.append([detokenize(example_hyp) for example_hyp in example_hyps])
-            gold_queries.append(gold_target[0])
+            strings_model = [detokenize(example_hyp) for example_hyp in example_hyps]
+            string_gold = gold_target[0]
+            strings_model, string_gold = format_lf(strings_model, string_gold)
+            model_outputs.append(strings_model)
+            print(type(strings_model[0]))
+            gold_queries.append(string_gold)
+            print(strings_model[0])
+            print(string_gold)
+            count_ += 1
+            if count_ > 5:
+                break
     return model_outputs, gold_queries
 
 
 def test(arg_parser):
     file_name_epoch_indep = get_model_name(arg_parser)
     recombination = arg_parser.recombination_method
-    test_dataset = get_dataset_finish_by(arg_parser.data_folder, 'test', f"{recombination}_recomb.tsv")
+    test_dataset = get_dataset_finish_by(arg_parser.data_folder, 'test', 't280.tsv')#f"{recombination}_recomb.tsv")
     vocab = Vocab(f'bert-{arg_parser.BERT}-uncased')
     file_path = os.path.join(arg_parser.models_path, f"{file_name_epoch_indep}_epoch_{arg_parser.epoch_to_load}.pt")
     model_type = TSP if arg_parser.TSP_BSP else BSP
@@ -293,7 +306,7 @@ def test(arg_parser):
                        dropout_rate=arg_parser.dropout, max_len_pe=arg_parser.max_len_pe, bert_name=arg_parser.BERT)
 
     load_model(file_path=file_path, model=model)
-    evaluation_methods = {'Knowledge-based':knowledge_based_evaluation, 'strict': strict_evaluation, 'jaccard': jaccard, 'jaccard_strict': jaccard_strict}
+    evaluation_methods = {'strict': strict_evaluation, 'jaccard': jaccard, 'jaccard_strict': jaccard_strict}
 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     model = model.to(device)
