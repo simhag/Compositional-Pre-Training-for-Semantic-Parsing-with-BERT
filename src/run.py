@@ -21,29 +21,29 @@ parser = ArgumentParser()
 parser.add_argument("--data_folder", type=str, default="geoQueryData")
 parser.add_argument("--out_folder", type=str, default="outputs")
 parser.add_argument("--log_dir", default='logs', type=str)
-parser.add_argument("--subdir", default="BERT_large", type=str)
+parser.add_argument("--subdir", default="shallow_TSP_fine_tuning", type=str)
 parser.add_argument("--models_path", default='models_to_keep', type=str)
 # MODEL
-parser.add_argument("--TSP_BSP", default=0, type=int, help="1: TSP model, 0:BSP")
+parser.add_argument("--TSP_BSP", default=1, type=int, help="1: TSP model, 0:BSP")
 parser.add_argument("--BERT", default="base", type=str, help="bert-base-uncased or bert-large-uncased (large)")
 # MODEL PARAMETERS
-parser.add_argument("--d_model", default=256, type=int)
-parser.add_argument("--d_int", default=1024, type=int)
+parser.add_argument("--d_model", default=128, type=int)
+parser.add_argument("--d_int", default=128, type=int)
 parser.add_argument("--h", default=8, type=int)
-parser.add_argument("--d_k", default=32, type=int)
+parser.add_argument("--d_k", default=16, type=int)
 parser.add_argument("--dropout", default=0.1, type=float)
-parser.add_argument("--n_layers", default=4, type=int)
-parser.add_argument("--max_len_pe", default=350, type=int)
+parser.add_argument("--n_layers", default=2, type=int)
+parser.add_argument("--max_len_pe", default=200, type=int)
 # DATA RECOMBINATION
 parser.add_argument("--recombination_method", default='entity+nesting+concat2', type=str)
 parser.add_argument("--extras_train", default=1800, type=int)
 parser.add_argument("--extras_dev", default=300, type=int)
 # TRAINING PARAMETERS
-parser.add_argument("--train_arg", default=1, type=int)
+parser.add_argument("--train_arg", default=0, type=int)
 parser.add_argument("--train_load", default=0, type=int)
 parser.add_argument("--batch_size", default=32, type=int)
 parser.add_argument("--clip_grad", default=5.0, type=float)
-parser.add_argument("--lr", default=0.001, type=float)
+parser.add_argument("--lr", default=0.0005, type=float)
 parser.add_argument("--optimizer", default=1, type=int)
 parser.add_argument("--warmups_steps", default=4000, type=int)
 parser.add_argument("--epochs", default=201, type=int)
@@ -51,8 +51,8 @@ parser.add_argument("--save_every", default=25, type=int)
 parser.add_argument("--log", default=True, type=bool)
 parser.add_argument("--shuffle", default=True, type=bool)
 # TESTING PARAMETERS
-parser.add_argument("--test_arg", default=0, type=int)
-parser.add_argument("--epoch_to_load", default=0, type=int)
+parser.add_argument("--test_arg", default=1, type=int)
+parser.add_argument("--epoch_to_load", default=195, type=int)
 parser.add_argument("--decoding", default='beam_search', type=str)
 parser.add_argument("--beam_size", default=5, type=int)
 parser.add_argument("--max_decode_len", default=250, type=int)
@@ -92,7 +92,7 @@ def get_model_name(argparser):
         base_model = 'TSP'
     else:
         base_model = 'BSP'
-    return f"{base_model}_d_model{argparser.d_model}_layers{argparser.n_layers}_recomb{argparser.recombination_method}_extrastrain{argparser.extras_train}_extrasdev{argparser.extras_dev}"
+    return base_model # f"{base_model}_d_model{argparser.d_model}_layers{argparser.n_layers}_recomb{argparser.recombination_method}_extrastrain{argparser.extras_train}_extrasdev{argparser.extras_dev}"
 
 
 def train(arg_parser):
@@ -111,10 +111,11 @@ def train(arg_parser):
     file_path = os.path.join(arg_parser.models_path, f"{file_name_epoch_indep}_epoch_{arg_parser.epoch_to_load}.pt")
     if arg_parser.train_load:
         train_dataset = get_dataset_finish_by(arg_parser.data_folder, 'train',
-                                              f"{600}_{recombination}_recomb.tsv")
+                                              f"600_entity_recomb.tsv")
         test_dataset = get_dataset_finish_by(arg_parser.data_folder, 'dev',
-                                             f"{100}_{recombination}_recomb.tsv")
+                                             f"100_entity_recomb.tsv")
         load_model(file_path=file_path, model=model)
+        #load_model(file_path=os.path.join('models_to_keep', 'BSP_d_model256_layers4_recombentity+nesting+concat2_extrastrain1800_extrasdev300_epoch_75.pt'), model=model)
         print('loaded model')
     else:
         train_dataset = get_dataset_finish_by(arg_parser.data_folder, 'train',
@@ -255,6 +256,9 @@ def knowledge_based_evaluation(model_queries, gold_queries, domain=domains.Geoqu
     n_correct = 0
     n_wrong = 0
     score = 0
+    biased_score = 0
+    biased_j_strict = 0
+    biased_strict = 0
     for i, gold_target in tqdm(enumerate(gold_queries)):
         derivs, denotation_correct_list = domain.compare_answers(true_answers=[gold_target],
                                                                  all_derivs=[model_queries[i]])
@@ -264,7 +268,16 @@ def knowledge_based_evaluation(model_queries, gold_queries, domain=domains.Geoqu
             assert len(denotation_correct_list) == 1
         else:
             n_wrong += 1
+            jac_score = jaccard_similarity(gold_target, model_queries[i][0])
+            biased_score += jac_score
+            if jac_score >= 1:
+                biased_j_strict += 1
+            if gold_target == model_queries[i][0]:
+                biased_strict += 1
     print(f"denotation matching did not work {n_wrong / (n_correct + n_wrong):.2f} of the time")
+    print(f"jaccard similarity on rejected examples {biased_score / n_wrong:.4f}")
+    print(f"biased jaccard strict {biased_j_strict/n_wrong:.4f}")
+    print(f"biased strict {biased_strict/n_wrong:.4f}")
     return score / n_correct
 
 
@@ -288,17 +301,17 @@ def decoding(loaded_model, test_dataset, arg_parser):
             strings_model, string_gold = format_lf(strings_model, string_gold)
             model_outputs.append(strings_model)
             gold_queries.append(string_gold)
-            print(strings_model)
-            print(string_gold)
-            if count_ >= 5:
-                break
+            #print(strings_model[0])
+            #print(string_gold)
             count_ +=1
+            #if count_ >= 15:
+            #    break
     return model_outputs, gold_queries, model_outputs_kb, gold_queries_kb
 
 def test(arg_parser):
     file_name_epoch_indep = get_model_name(arg_parser)
     recombination = arg_parser.recombination_method
-    test_dataset = get_dataset_finish_by(arg_parser.data_folder, 'test', f"{recombination}_recomb.tsv")
+    test_dataset = get_dataset_finish_by(arg_parser.data_folder, 'test', 't280.tsv')# f"{recombination}_recomb.tsv")
     vocab = Vocab(f'bert-{arg_parser.BERT}-uncased')
     file_path = os.path.join(arg_parser.models_path, f"{file_name_epoch_indep}_epoch_{arg_parser.epoch_to_load}.pt")
     model_type = TSP if arg_parser.TSP_BSP else BSP

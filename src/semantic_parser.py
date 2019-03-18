@@ -512,7 +512,7 @@ class BSP(nn.Module):
                 len_hyps = new_len_hyps
                 hyp_scores = torch.tensor(new_hyp_scores, dtype=torch.float, device=self.device)
             hypotheses_padded = self.target_vocab.tokens_to_tensor(hypotheses, device=self.device)
-            hyp_tokens_mask = TSP.generate_target_mask(hypotheses_padded, pad_idx=0)
+            hyp_tokens_mask = BSP.generate_target_mask(hypotheses_padded, pad_idx=0)
 
         completed_hypotheses.sort(key=lambda hyp: hyp.score, reverse=True)
         return [hyp.value for hyp in completed_hypotheses[:beam_size]]
