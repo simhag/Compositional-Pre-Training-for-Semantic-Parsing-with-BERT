@@ -360,6 +360,12 @@ def attention_vis(arg_parser, sent, tgt_sent, path):
     source_tensor = model.model_embeddings_source(model.input_vocab.to_input_tensor(sent, device=model.device))
     input_padding_mask = model.generate_sent_masks(source_tensor, source_lengths)
 
+    target_tokens = model.target_vocab.to_input_tokens(tgt_sent)
+    target_tokens = [['[START]'] + tokens for tokens in target_tokens]
+    target_tokens_padded = model.target_vocab.tokens_to_tensor(target_tokens, device=model.device)
+    target_tokens_mask = TSP.generate_target_mask(target_tokens_padded, pad_idx=0)
+    input_dec = model.model_embeddings_target(target_tokens_padded)
+
     seaborn.set(font_scale=0.75)
 
     # Visualization for Encoder
@@ -372,21 +378,25 @@ def attention_vis(arg_parser, sent, tgt_sent, path):
             x = [str_ for str_ in source_token[0]], y = [str_ for str_ in source_token[0]] if h ==0 else [], ax=axs[h])
         plt.show()
 
+    seaborn.set(font_scale=0.55)
+
     # Visualization for Decoder
-#    for layer in range(arg_parser.n_layers):
-#        fig, axs = plt.subplots(1,arg_parser.h, figsize=(20, 10))
-#        print("Decoder Self Layer", layer+1)
-#        model.decoder.layers_decoder[layer].MultiHead(Q = source_tensor, K = source_tensor, V = source_tensor, mask = input_padding_mask)
-#        for h in range(arg_parser.h):
-#            draw(model.decoder.layers[layer].MultiHead.attention[0, h].data[:len(tgt_sent), :len(tgt_sent)], 
-#                x = tgt_sent, y = tgt_sent if h ==0 else [], ax=axs[h])
-#        plt.show()
-#        print("Decoder Src Layer", layer+1)
-#        fig, axs = plt.subplots(1,arg_parser.h, figsize=(20, 10))
-#        for h in range(arg_parser.h):
-#            draw(model.decoder.layers_decoder[layer].MultiHead.attention[0, h].data[:len(tgt_sent), :len(sent)], 
-#                x = sent, y = tgt_sent if h ==0 else [], ax=axs[h])
-#        plt.show()
+    for layer in range(arg_parser.n_layers):
+        fig, axs = plt.subplots(1,arg_parser.h, figsize=(20, 10))
+        print("Decoder Self Layer", layer+1)
+        out_dec1 = model.decoder.layers_decoder[layer].MultiHead1(Q = input_dec, K = input_dec, V = input_dec, mask = target_tokens_mask)
+        out_enc = model.encoder.layers_encoder[layer].MultiHead(Q = source_tensor, K = source_tensor, V = source_tensor, mask = input_padding_mask)
+        model.decoder.layers_decoder[layer].MultiHead2(Q = out_dec1, K = out_enc, V = out_enc, mask = input_padding_mask)
+        for h in range(arg_parser.h):
+            draw(model.decoder.layers_decoder[layer].MultiHead1.attention[0, h].data[:len(target_tokens[0]), :len(target_tokens[0])], 
+                x = [str_ for str_ in target_tokens[0]], y = [str_ for str_ in target_tokens[0]] if h ==0 else [], ax=axs[h])
+        plt.show()
+        print("Decoder Src Layer", layer+1)
+        fig, axs = plt.subplots(1,arg_parser.h, figsize=(20, 10))
+        for h in range(arg_parser.h):
+            draw(model.decoder.layers_decoder[layer].MultiHead2.attention[0, h].data[:len(target_tokens[0]), :len(source_token[0])], 
+                x = [str_ for str_ in source_token[0]], y = [str_ for str_ in target_tokens[0]] if h ==0 else [], ax=axs[h])
+        plt.show()
 
 
 if __name__ == '__main__':
