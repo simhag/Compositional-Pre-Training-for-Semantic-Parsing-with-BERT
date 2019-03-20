@@ -346,7 +346,7 @@ def draw(data, x, y, ax):
                     xticklabels=x, square=True, yticklabels=y, vmin=0.0, vmax=1.0, 
                     cbar=False, ax=ax)
 
-def test_draw(arg_parser, sent, path):
+def attention_vis(arg_parser, sent, tgt_sent, path):
     vocab = Vocab(f'bert-{arg_parser.BERT}-uncased')
     model = TSP(input_vocab=vocab, target_vocab=vocab, d_model=arg_parser.d_model, d_int=arg_parser.d_int,
                        d_k=arg_parser.d_k, h=arg_parser.h, n_layers=arg_parser.n_layers,
@@ -360,18 +360,39 @@ def test_draw(arg_parser, sent, path):
     source_tensor = model.model_embeddings_source(model.input_vocab.to_input_tensor(sent, device=model.device))
     input_padding_mask = model.generate_sent_masks(source_tensor, source_lengths)
 
-    for layer in range(2):
-        fig, axs = plt.subplots(1,8, figsize=(20, 10))
+    seaborn.set(font_scale=0.75)
+
+    # Visualization for Encoder
+    for layer in range(arg_parser.n_layers):
+        fig, axs = plt.subplots(1,arg_parser.h, figsize=(20, 10))
         print("Encoder Layer", layer+1)
         model.encoder.layers_encoder[layer].MultiHead(Q = source_tensor, K = source_tensor, V = source_tensor, mask = input_padding_mask)
-        for h in range(4):
+        for h in range(arg_parser.h):
             draw(data = model.encoder.layers_encoder[layer].MultiHead.attention[0,h].data, 
-            x = source_token, y = source_token, ax=axs[h])
+            x = [str_ for str_ in source_token[0]], y = [str_ for str_ in source_token[0]] if h ==0 else [], ax=axs[h])
         plt.show()
+
+    # Visualization for Decoder
+#    for layer in range(arg_parser.n_layers):
+#        fig, axs = plt.subplots(1,arg_parser.h, figsize=(20, 10))
+#        print("Decoder Self Layer", layer+1)
+#        model.decoder.layers_decoder[layer].MultiHead(Q = source_tensor, K = source_tensor, V = source_tensor, mask = input_padding_mask)
+#        for h in range(arg_parser.h):
+#            draw(model.decoder.layers[layer].MultiHead.attention[0, h].data[:len(tgt_sent), :len(tgt_sent)], 
+#                x = tgt_sent, y = tgt_sent if h ==0 else [], ax=axs[h])
+#        plt.show()
+#        print("Decoder Src Layer", layer+1)
+#        fig, axs = plt.subplots(1,arg_parser.h, figsize=(20, 10))
+#        for h in range(arg_parser.h):
+#            draw(model.decoder.layers_decoder[layer].MultiHead.attention[0, h].data[:len(tgt_sent), :len(sent)], 
+#                x = sent, y = tgt_sent if h ==0 else [], ax=axs[h])
+#        plt.show()
+
 
 if __name__ == '__main__':
     args = parser.parse_args()
     main(args)
     #sent = ['which state is the smallest ?']
+    #tgt_sent = ['_answer ( NV , _smallest ( V0 , _state ( V0 ) ) )']
     #path = "models/TSP_epoch_195.pt"
-    #test_draw(arg_parser = args, sent = sent, path = path)
+    #attention_vis(arg_parser = args, sent = sent, tgt_sent = tgt_sent, path = path)
