@@ -8,3 +8,4 @@ src/evaluator
 src/state
 src/models_to_keep/
 src/geoQueryData/
+src/models_TSP_3recomb

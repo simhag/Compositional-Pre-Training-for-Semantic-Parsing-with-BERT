@@ -87,7 +87,6 @@ class TransformerEncoder(nn.Module):
     def forward(self, input_enc, multihead_mask=None):
         for layer in self.layers_encoder:
             input_enc = layer(input_enc=input_enc, multihead_mask=multihead_mask)
-            # ATTENTION: ADD MASK
         return input_enc
 
 

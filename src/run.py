@@ -13,6 +13,10 @@ import math
 import numpy as np
 from tqdm import tqdm
 import data_recombination
+import matplotlib.pyplot as plt
+import seaborn
+seaborn.set_context(context="talk")
+
 
 DOMAIN = 'geoquery'
 
@@ -337,6 +341,44 @@ def test(arg_parser):
     return None
 
 
+def draw(data, x, y, ax):
+    seaborn.heatmap(data, 
+                    xticklabels=x, square=True, yticklabels=y, vmin=0.0, vmax=1.0, 
+                    cbar=False, ax=ax)
+
+def test_draw(arg_parser, sent, path):
+    vocab = Vocab(f'bert-{arg_parser.BERT}-uncased')
+    model = TSP(input_vocab=vocab, target_vocab=vocab, d_model=arg_parser.d_model, d_int=arg_parser.d_int,
+                       d_k=arg_parser.d_k, h=arg_parser.h, n_layers=arg_parser.n_layers,
+                       dropout_rate=arg_parser.dropout, max_len_pe=arg_parser.max_len_pe, bert_name=arg_parser.BERT)
+    checkpoint = torch.load(path)
+    model.load_state_dict(checkpoint['semantic_parser'])
+    #source_tokens = model.vocab.to_input_tokens(sent)
+
+    source_token = model.input_vocab.to_input_tokens(sent)
+    source_lengths = [len(s) for s in source_token]
+    source_tensor = model.model_embeddings_source(model.input_vocab.to_input_tensor(sent, device=model.device))
+    # feed to Transformer encoder
+    input_padding_mask = model.generate_sent_masks(source_tensor, source_lengths)
+
+    model.encoder.layers_encoder[1].MultiHead(Q = source_tensor, K = source_tensor, V = source_tensor, mask = input_padding_mask)
+    fig, axs = plt.subplots(1,4, figsize=(20, 10))
+    draw(data = model.encoder.layers_encoder[1].MultiHead.attention[:,0,0,0].data.unsqueeze(dim=1), 
+            x = sent, y = sent, ax=axs[0])
+    plt.show()
+    #for layer in range(0, 2):
+    #    fig, axs = plt.subplots(1,4, figsize=(20, 10))
+    #    print("Encoder Layer", layer+1)
+    #    print(model.encoder.layers_encoder[layer].MultiHead.attention)
+#        for h in range(4):
+#            draw(data = model.encoder.layers_encoder[layer].MultiHead.attention[0, h].data, 
+#            x = sent, y = sent if h ==0 else [], ax=axs[h])
+        #plt.show()
+
+
 if __name__ == '__main__':
     args = parser.parse_args()
     main(args)
+    #sent = 'which state is the smallest ?'
+    #path = "models/TSP_epoch_195.pt"
+    #test_draw(arg_parser = args, sent = sent, path)
